@@ -1,0 +1,22 @@
+*~
+*.bak
+Thumbs.db
+desktop.ini
+.DS_Store
+.buildpath
+.project
+.settings
+*.tmproj
+fuel/app/logs/*/*/*
+fuel/app/cache/*/*
+build
+nbproject/
+.idea
+<<<<<<< HEAD
+*.tmproj
+*.sublime-project
+*.sublime-workspace
+=======
+
+/fuel/app/config/crypt.php
+>>>>>>> da72a31b278d74c0c538c9957efdc38d212f0319

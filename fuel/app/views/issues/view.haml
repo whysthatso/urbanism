@@ -1,0 +1,130 @@
+
+.three.alpha.issue_browser#sidebar
+	.inner_browser
+		%img{:src => "/images/covers/#{$issue['smallimage']}", :width => "150"}
+		.legend.#featured_scroll
+			- $last_chapter = 0;
+			- $sets = array_chunk($issue['articles'], 3)
+			- $group_index = 0;
+			- foreach($sets as $article_group)
+				- $group_index++;
+				.group_slide
+					.toc_center
+						%a{:href => "#", :class => 'sidebar_prev'}
+							%img{:src => '/assets/img/arrow_left_small.png'}
+						= $group_index . ' / ' . sizeof($sets)
+						%a{:href => "#", :class => 'sidebar_next'}
+							%img{:src => '/assets/img/arrow_right_small.png'}
+					- foreach($article_group as $article)
+						- if ($article['locale'] != $locale) continue;
+						.legend_item
+							- if (($article['chapter_id'] != 0) && ($article['chapter_id'] != $last_chapter))
+								.legend_chapter= $article['chapter']['name_' . $locale]
+								- $last_chapter = $article['chapter_id']
+							.legend_link
+								%a{:href => "#", :onclick => "javascript:$('html,body').animate({ scrollTop: $('#article_#{$article->id}').offset().top - 105}, 800);"}
+									= $article->title
+							.legend_byline= $article->byline
+	.print_issue
+		- $pdffilename = ($locale == 'ee' ? $issue->pdf : $issue->pdfen)
+		%a{:href => "/pdf/#{$issue->number}/#{$pdffilename}" }
+			%p= ($locale == 'ee' ? 'Prindi kogu U (PDF)' : 'Print whole U (PDF)')	
+			.image_class
+				%img{:src => '/assets/img/print_icon.png'}
+			
+
+.issue_container
+	- $slidejs = ''
+	- foreach($issue['articles'] as $article)
+		- if ($article['locale'] != $locale) continue;
+		- if (!Auth::check())
+			- if ($article['published'] != true) continue;
+
+		.entry.clearfix{:id => "article_#{$article->id}"}
+			%a{:class => :placeholder, :name => "#{$article->id}"}			
+			- if ($article['chapter_id'] == 0)
+				.chapter 
+			- else
+				.chapter= $article['chapter']['name_'. $locale]
+			.article.clearfix
+
+				.article_title= $article->title
+				.article_subtitle= $article->subtitle
+				.article_byline= $article->byline
+				.article_author_bio=$article->author_bio
+				.article_body
+					- $body = $article->body
+					- if (sizeof($article['carouselimages']) > 0)
+						- preg_match_all('/\*\*CAROUSEL\[*(\d+)*\-*(\d+)*\,*(\d+)*x*(\d+)*\]*\*\*/',  $article->body, $matches)
+						
+						- if (isset($matches))
+							
+							
+							- $mi = 0;
+							- foreach($matches[0] as $carousel_string)
+								- $width = 750
+								- $height = 500
+								- if ($matches[1][$mi] == '' || $matches[2][$mi] == '')
+									- $useall = true;
+								- else
+									- $useall = false;
+									- $startindex = $matches[1][$mi]
+									- $finishindex = $matches[2][$mi]
+								- if ($useall == true)
+		
+									- if ($matches[2][$mi] == '' && $matches[3][$mi] == '' && $matches[4][$mi] != '')
+										- $width = $matches[1][$mi]
+										- $height = $matches[4][$mi]
+
+								- $carousels[$mi] = '<div class="slidebox" style="width: ' . $width  . 'px;" id="slides_' . $article['id'] . '_' . $mi .'"><div class="slides_container" style="width:' . $width . 'px; height: "' . $height .'px;">'
+								- $cc = $article['carouselimages']
+								- usort($cc, function($a, $b) { return $a['sortorder'] - $b['sortorder'];	})
+								- foreach($cc as $ci)
+									- if ($useall == false)
+										- if ($ci['sortorder'] < $startindex || $ci['sortorder'] > $finishindex)
+											- continue
+									- $carousels[$mi] .= '<div style="min-height:' . $height .'px;"><img src="/images/carousels/' . $ci['filename'] . '">'
+										- $carousels[$mi] .= '</div>'
+								- $carousels[$mi] .= '</div>'
+								- $carousels[$mi] .= '<a href="#" class="prev" id="prev_' . $article['id'] . '_' . $mi . '"><img src="/assets/img/arrow_left.png" width=24 height=25></a>'
+								- $carousels[$mi] .= '<div class="caption_container"  id="captions_' . $article['id'] . '_' . $mi .'">'
+								- foreach($cc as $ci)
+									- if ($useall == false)
+										- if ($ci['sortorder'] < $startindex || $ci['sortorder'] > $finishindex)
+											- continue
+									- if ($ci['caption'] != '')
+										- $carousels[$mi] .= '<div class="captions" >' . $ci['caption'] . '</div>'
+									- else
+										- $carousels[$mi] .= '<div class="captions" >&nbsp;' . '</div>'
+								- $carousels[$mi] .= '</div>'
+								- $carousels[$mi] .= '<a href="#" class="next" id="next_' . $article['id'] . '_' . $mi . '"><img src="/assets/img/arrow_right.png" width=24 height=25></a></div>'
+								- $slidejs .=  '$("#slides_' . $article['id'] . '_' . $mi . '").slides({generateNextPrev: false});'
+								- $slidejs .= "\n"
+								- $slidejs .= '$("#captions_' . $article['id'] . '_' . $mi . '").cycle( {fx: ' . "'scrollHorz', prev: '#prev_". $article['id'] . '_' . $mi . "', next: '#next_". $article['id'] . '_' . $mi . "', speed: 300, fit: true, 	width: " . ($width - 66) . ", timeout: 0});\n"
+								
+								- $body = str_replace($carousel_string, $carousels[$mi], $body)
+								- $mi++;								
+					= html_entity_decode($body, ENT_QUOTES, 'UTF-8');
+			- if (isset($article->pdf))
+				- if ($article->pdf != '')
+					- if (file_exists(DOCROOT.DS.'/pdf/'.$issue->number.'/'.$article->pdf))
+						.pdf_download
+							%a{:href => "/pdf/#{$issue->number}/#{$article->pdf}" }
+								.image_class
+									%img{:src => '/assets/img/print_icon.png'}
+								%p= ($locale == 'ee' ? 'Prindi see artikkel' : 'Print this article')
+								
+
+	:javascript
+		$(document).ready(function () {
+			<?php if ($slidejs != '') echo $slidejs; ?>
+			$('#featured_scroll').cycle( {
+				fx: 'scrollHorz',
+				prev: '.sidebar_prev',
+				next: '.sidebar_next',
+				speed: 300,
+				timeout: 0
+			});
+
+
+		});

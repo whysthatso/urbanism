@@ -1,0 +1,63 @@
+.sixteen.columns.issue_index
+  - if (sizeof($issues) > 0 ) 
+    .six.columns.alpha
+      - $latest = array_keys($issues)
+
+      %a{:href => "/issue/#{$locale}/#{$issues[$latest[0]]['number']}"}
+        %img{:src => "/images/covers/<?php echo $issues[$latest[0]]['largeimage']; ?>", :width => "340", :height => "479" }
+    .seven.columns.omega.issue_front_main
+      .main_screen_title
+        = "U". $issues[$latest[0]]->number
+        = " / " . $issues[$latest[0]]->title
+      .subtitle= $issues[$latest[0]]->subtitle
+      .description
+        = $locale == 'ee' ? $issues[$latest[0]]->short_description : $issues[$latest[0]]->short_description_en
+        .read_more
+          %a{:href => "/issue/#{$locale}/#{$issues[$latest[0]]['number']}"}= ($locale == 'ee' ? 'loe edasi' : 'read more')
+
+  - else
+    No content yet.
+- $last = array_slice($issues, -1, 1)
+- preg_match('/^\d{4}/', $issues[$latest[1]]->publication_date, $current_year)
+- preg_match('/^\d{4}/', $last[0]->publication_date, $final_year)
+- GLOBAL $cy
+- $cy = $current_year[0]
+- $yearcount = 0;
+
+.sixteen.columns.old_issues.alpha    
+  .year
+    - foreach(array_slice($issues, 1) as $old_issue)
+      - preg_match('/^\d{4}/', $old_issue->publication_date, $new_year)
+      - if ($cy != $new_year[0])
+        = "<div class=\"year_text\">" .$cy .  "</div></div><div class=\"year\">"
+        - $yearcount++;
+        - $cy = $new_year[0]
+
+
+      - if (sizeof($old_issue['articles']) == 0)
+        -if (isset($old_issue->pdf)) 
+          - if (file_exists(DOCROOT.DS.'/pdf/'.$old_issue->number.'/'.$old_issue->pdf))
+            .column
+              %a{:href => "/pdf/#{$old_issue->number}/#{$old_issue->pdf}"}
+                %img{:src => "/images/covers/#{$old_issue->smallimage}", :width => "160", :height => "221"}
+      - else
+        .column
+          %a{:href => "/issue/#{$locale}/#{$old_issue->number}"}
+            %img{:src => "/images/covers/#{$old_issue->smallimage}", :width => "160", :height => "221"}
+
+    .year_text= $final_year[0]
+.bottom
+  .staff
+    = $locale == 'ee' ? "U toimetuskolleegium: Kaija-Luisa Kurik, Keiti Kljavin, Teele Pehk." : "U Editorial Board: Kaija-Luisa Kurik, Keiti Kljavin, Teele Pehk."
+  .support
+    %a{:href => "http://linnalabor.ee/"}
+      %img{:src => "/assets/img/linnalabor.png"}
+      %p
+        = $locale == 'ee' ? "Kord kvartalis ilmuvat urbanistide väljaannet U annab välja Linnalabor." : "Quarterly Estonian Urbanists' Review is given out by Linnalabor."
+
+  .support
+    %a{:href => "http://kulka.ee/"}
+      %img{:src => "/assets/img/kulka.png"}
+      %p 
+        = $locale == 'ee' ? "U väljaandmist toetab Eesti Kultuurkapital." : "U is funded by the Cultural Endowment of Estonia."
+
