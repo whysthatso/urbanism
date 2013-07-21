@@ -4,33 +4,38 @@
  */
 
  CKEDITOR.stylesSet.add('default',[
+ 		{name:'Cited Work',element:'cite'},
  		{name:'Franklin Title small',element:'p',attributes:{class:'franklin_subtitle_small'}},	
  		{name:'Franklin Title big',element:'p',attributes:{class:'franklin_subtitle_big'}},
-
  		{name:'Metadata',element:'p',attributes:{class:'metadata'}},
  		{name:'Metadata bold',element:'p',attributes:{class:'metadata_bold'}},
- 		{name:'Event date italics',element:'p',attributes:{class:'event_date'}},	 		
-  	{name:'Wide image',element:'p',attributes:{class:'wide_image'}},
- 		{name:'Big',element:'big'},{name:'Small',element:'small'},
- 		{name:'Typewriter',element:'tt'},{name:'Computer Code',element:'code'},
- 		{name:'Keyboard Phrase',element:'kbd'},{name:'Sample Text',element:'samp'},
- 		{name:'Variable',element:'var'},{name:'Deleted Text',element:'del'},
- 		{name:'Inserted Text',element:'ins'},{name:'Cited Work',element:'cite'},
- 		{name:'Inline Quotation',element:'q'},
- 		{name:'Language: RTL',element:'span',attributes:{dir:'rtl'}},
- 		{name:'Language: LTR',element:'span',attributes:{dir:'ltr'}},
- 		{name:'Image on Left',element:'img',attributes:{style:'padding: 5px; margin-right: 5px',border:'2',align:'left'}},
- 		{name:'Image on Right',element:'img',attributes:{style:'padding: 5px; margin-left: 5px',border:'2',align:'right'}},
- 		{name:'Borderless Table',element:'table',styles:{'border-style':'hidden','background-color':'#E6E6FA'}},
- 		{name:'Square Bulleted List',element:'ul',styles:{'list-style-type':'square'}}]);
+ 		{name:'Event date italics',element:'p',attributes:{class:'event_date'}},
+  		{name:'Wide image',element:'p',attributes:{class:'wide_image'}},
 
-
+ 		//{name:'Big',element:'big'},
+ 		//{name:'Small',element:'small'},
+ 		//{name:'Typewriter',element:'tt'},
+ 		//{name:'Computer Code',element:'code'},
+ 		//{name:'Keyboard Phrase',element:'kbd'},
+ 		//{name:'Sample Text',element:'samp'},
+ 		//{name:'Variable',element:'var'},
+ 		//{name:'Deleted Text',element:'del'},
+ 		//{name:'Inserted Text',element:'ins'},
+ 		//{name:'Inline Quotation',element:'q'},
+ 		//{name:'Language: RTL',element:'span',attributes:{dir:'rtl'}},
+ 		//{name:'Language: LTR',element:'span',attributes:{dir:'ltr'}},
+ 		//{name:'Image on Left',element:'img',attributes:{style:'padding: 5px; margin-right: 5px',border:'2',align:'left'}},
+ 		//{name:'Image on Right',element:'img',attributes:{style:'padding: 5px; margin-left: 5px',border:'2',align:'right'}},
+ 		//{name:'Borderless Table',element:'table',styles:{'border-style':'hidden','background-color':'#E6E6FA'}},
+ 		//{name:'Square Bulleted List',element:'ul',styles:{'list-style-type':'square'}}
+ 		]);
 
 CKEDITOR.editorConfig = function( config ) {
 	// Define changes to default configuration here.
 	// For the complete reference:
 	// http://docs.ckeditor.com/#!/api/CKEDITOR.config
 
+  config.contentsCss = '/assets/css/u.css';
   config.entities = false;
   config.entities_latin = false;
   config.htmlEncodeOutput = false;

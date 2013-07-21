@@ -15,5 +15,8 @@ nbproject/
 .svn*
 .svn
 /fuel/app/config/crypt.php
+/fuel/app/config/development/db.php
 /public/images/*
 /public/pdf/*
+/config/
+Capfile

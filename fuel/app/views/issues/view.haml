@@ -35,6 +35,22 @@
 
 .issue_container
 	- $slidejs = ''
+	.entry.clearfix{:id => "contents"}
+		.chapter= ($locale == 'ee' ? 'SISUKORD' : 'CONTENTS')	
+		.contents.clearfix
+			.contents_body
+				.contents_title= $issue->title
+				- $articles = $issue['articles']
+				- foreach($articles as $article)
+					- if ($article['locale'] != $locale) continue;
+					- if (($article['chapter_id'] != 0) && ($article['chapter_id'] != $last_chapter))
+						%p{:class => "event_date"}= $article['chapter']['name_' . $locale]
+						- $last_chapter = $article['chapter_id']
+					%p{:class => "franklin_subtitle_small"}
+						%a{:href => "#", :onclick => "javascript:$('html,body').animate({ scrollTop: $('#article_#{$article->id}').offset().top - 105}, 800);"}
+							= $article->title
+					%span{:class => "contents_small"}= $article->byline
+
 	- foreach($issue['articles'] as $article)
 		- if ($article['locale'] != $locale) continue;
 		- if (!Auth::check())
