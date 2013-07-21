@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="http://f.fontdeck.com/s/css/ztizLcpXY96pMPqC/s/lM7UN2Ro/u.cenotaph.org/26895.css" type="text/css" />   
 <link rel="shortcut icon" href="/assets/img/favicon.ico" />
 <script type="text/javascript">
-/*
+
   var _gaq = _gaq || [];
   _gaq.push(['_setAccount', 'UA-37404427-1']);
 
@@ -29,7 +29,7 @@
 
     var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
   })();
-*/
+
 </script>
 
 </head>
