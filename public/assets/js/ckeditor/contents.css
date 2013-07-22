@@ -91,3 +91,85 @@ img:hover {
 	opacity: .9;
 	filter: alpha(opacity = 90);
 }
+
+/* added styles - sync with u.css */
+
+.normalParagraph {
+  font-size:13px;
+  text-align: left;
+  color: #444444;
+  font-family: Georgia,serif;
+  font-size: 10pt;
+  line-height: 16pt;
+  padding-right: 10px;
+  width: 570px;
+}
+
+.quote {
+  float: right;
+  font-family: Helvetica, sans-serif;
+  font-size: 8pt;
+  line-height: 11pt;
+  color: #777;
+  right: 0;
+  width: 150px;
+  border: none;
+  margin-right: -200px;
+  z-index: 1;
+}
+
+.metadata_bold { 
+  margin-bottom: 0px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 8pt;
+  color: #000;
+  font-weight: bold;
+}
+
+ .metadata {
+  margin-bottom: 0px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 8pt;
+  color: #444;
+}
+
+.wide_image {
+  width: 750px;
+}
+
+.event_date {
+  font-family:"FrankliGothiCondenseURDemBol", 'Arial Narrow', Arial, sans-serif; 
+  font-size-adjust:0.49; font-weight:normal; font-style:italic; 
+  margin-bottom: 0px;
+  font-size: 9pt;
+  line-height: 10pt;
+}
+
+.franklin_subtitle_small {
+  font-family:"FrankliGothiCondenseURDemBol", 'Arial Narrow', Arial, sans-serif; 
+  font-size-adjust:0.49; font-weight:bold; font-style:normal; 
+  font-size: 14pt;
+  margin-bottom:0px;
+  line-height: 16pt;
+}
+
+.franklin_subtitle_big {
+  font-family:"FrankliGothiCondenseURDemBol", 'Arial Narrow', Arial, sans-serif; 
+  font-size-adjust:0.49; font-weight:bold; font-style:normal; 
+  font-size: 21pt;
+  margin-bottom:0px;
+  line-height: 24pt;
+}
+
+cite {
+  float: right;
+  font-family: Helvetica, sans-serif;
+  font-size: 8pt;
+  line-height: 11pt;
+  color: #777;
+  right: 0;
+  width: 150px;
+  border: none;
+  margin-right: -200px;
+  z-index: 1;*/
+}

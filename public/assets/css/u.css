@@ -124,14 +124,15 @@ ul.pagination {
 
 .header .right {
   float: right;
-  margin-top: -4px;
+  margin-top: -24px;
 }
 
 .header .right .lang {
-  font-size: 8pt;
+  font-size: 10pt;
   font-weight: normal;
   float: right;
   font-family: Helvetica, Arial, sans-serif;
+  text-align: right;
 
 }
   .header .right .lang span.active_lang {
@@ -145,7 +146,7 @@ ul.pagination {
   font-size-adjust:0.49; font-weight:bold; font-style:normal; 
   text-transform: uppercase;
   font-size: 12pt;
-  padding-top: 5px;
+  padding-top: 22px;
   float: right;
   line-height: 18pt;
 }
@@ -345,11 +346,11 @@ table.admin_issue_table {
 .issue_container .article .article_body p a {
   text-decoration: underline;
 }
-/* .issue_container .article .article_body p.wide_image */
+.issue_container .article .article_body p.wide_image,
 .wide_image {
   width: 750px;
 }
-/*.issue_container .article .article_body p.event_date*/
+.issue_container .article .article_body p.event_date,
 .event_date {
     font-family:"FrankliGothiCondenseURDemBol", 'Arial Narrow', Arial, sans-serif; 
   font-size-adjust:0.49; font-weight:normal; font-style:italic; 
@@ -357,7 +358,7 @@ table.admin_issue_table {
   font-size: 9pt;
   line-height: 10pt;
 }
-/*.issue_container .article .article_body p.franklin_subtitle_small,*/
+.issue_container .article .article_body p.franklin_subtitle_small,
 .franklin_subtitle_small {
   font-family:"FrankliGothiCondenseURDemBol", 'Arial Narrow', Arial, sans-serif; 
   font-size-adjust:0.49; font-weight:bold; font-style:normal; 
@@ -365,7 +366,7 @@ table.admin_issue_table {
   margin-bottom:0px;
   line-height: 16pt;
 }
-/*.issue_container .article .article_body p.franklin_subtitle_big,*/
+.issue_container .article .article_body p.franklin_subtitle_big,
 .franklin_subtitle_big {
   font-family:"FrankliGothiCondenseURDemBol", 'Arial Narrow', Arial, sans-serif; 
   font-size-adjust:0.49; font-weight:bold; font-style:normal; 
@@ -381,7 +382,7 @@ table.admin_issue_table {
   color: #000;
   font-weight: bold;
 }
-/*.issue_container .article .article_body p.metadata,*/
+.issue_container .article .article_body p.metadata,
  .metadata {
   margin-bottom: 0px;
   font-family: Helvetica, Arial, sans-serif;
@@ -390,9 +391,9 @@ table.admin_issue_table {
 
 }
 
-/*.issue_container .article .article_body cite,*/
-cite {
-  float: right  ;
+.issue_container .article .article_body cite,
+cite, .quote {
+  float: right;
   font-family: Helvetica, sans-serif;
   font-size: 8pt;
   line-height: 11pt;
@@ -596,11 +597,11 @@ cite {
 }
 
 div.mc-field-group input, div.mc-field-group input:focus {
-  background-color: black;
-  color: white;
-  border: none;
+  
+  border: 1px solid black;
   outline: none !important;
   width: 190px !important;
   text-align: right;
+  height: 10px;
 }
 

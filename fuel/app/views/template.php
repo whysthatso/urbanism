@@ -62,7 +62,7 @@
               if (Auth::check()) { ?>
               <?php echo Html::anchor('/admin/issues', 'Admin');
             } ?><br />
-            <span style="float:right;font-size:8pt;line-height:8pt;"><a href="#"></a><strong>ABOUT</strong></span>
+            <span style="float:right;font-size:10pt;line-height:10pt;margin-right:4px;"><a href="#"></a><em>ABOUT U</em></span>
           </div>
 
         </div>
@@ -85,20 +85,20 @@
             <form action="http://urban.us4.list-manage.com/subscribe/post?u=8ca824e2252482fe0cd04801e&amp;id=8805fe525b" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" novalidate>          
               <div class="mc-field-group">
                 <input type="email" name="EMAIL" class="required email" id="mce-EMAIL"
-                 onblur="if (this.value == '') {this.value = 'LIITU UUDISKIRJAGA';}" onfocus="if (this.value == 'LIITU UUDISKIRJAGA') {this.value = '';}" value="LIITU UUDISKIRJAGA">
+                 onblur="if (this.value == '') {this.value = 'e-mail siia!';}" onfocus="if (this.value == 'e-mail siia!') {this.value = '';}" value="e-mail siia!">
               </div> 
               <div>
-                <input type="submit" value="LIITU" name="subscribe" id="mc-embedded-subscribe" class="button">
+                <input type="submit" value="LIITU UUDISKIRJAGA" name="subscribe" id="mc-embedded-subscribe" class="button">
               </div>
            </form>
          <?php } else { ?>
           <form action="http://urban.us4.list-manage.com/subscribe/post?u=8ca824e2252482fe0cd04801e&amp;id=8805fe525b" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" novalidate>          
             <div class="mc-field-group">
               <input type="email" name="EMAIL" class="required email" id="mce-EMAIL"
-               onblur="if (this.value == '') {this.value = 'SUBSCRIBE TO U';}" onfocus="if (this.value == 'SUBSCRIBE TO U') {this.value = '';}" value="SUBSCRIBE TO U">
+               onblur="if (this.value == '') {this.value = 'email';}" onfocus="if (this.value == 'email') {this.value = '';}" value="email">
             </div> 
             <div>
-              <input type="submit" value="SUBSCRIBE" name="subscribe" id="mc-embedded-subscribe" class="button">
+              <input type="submit" value="SUBSCRIBE TO U" name="subscribe" id="mc-embedded-subscribe" class="button">
             </div>
           </form>
          <?php } ?>
