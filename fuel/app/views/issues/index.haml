@@ -5,7 +5,7 @@
 
       %a{:href => "/issue/#{$locale}/#{$issues[$latest[0]]['number']}"}
         %img{:src => "/images/covers/<?php echo $issues[$latest[0]]['largeimage']; ?>", :width => "340", :height => "479" }
-    .seven.columns.omega.issue_front_main
+    .seven.columns.issue_front_main
       .main_screen_title
         = "U". $issues[$latest[0]]->number
         = " / " . $issues[$latest[0]]->title
@@ -14,6 +14,17 @@
         = $locale == 'ee' ? $issues[$latest[0]]->short_description : $issues[$latest[0]]->short_description_en
         .read_more
           %a{:href => "/issue/#{$locale}/#{$issues[$latest[0]]['number']}"}= ($locale == 'ee' ? 'loe edasi' : 'read more')
+    .two.columns.omega.issue_front_subscribe
+      #mc_embed_signup
+        - if (!preg_match('/\/issue\//', Uri::current())) {
+        - if (preg_match('/\/ee\//', Uri::current()) || Uri::string() == '') {
+          %a.subscribe{:href => "#subscribe_ee"}
+            %img{:src => "/assets/img/telli_90px.png"}/
+        - } else {
+          %a.subscribe{:href => "#subscribe_eng"}
+            %img{:src => "/assets/img/subscribe_90px.png"}/
+        - }
+        - }
 
   - else
     No content yet.
