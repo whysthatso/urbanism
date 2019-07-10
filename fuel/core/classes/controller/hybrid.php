@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -23,18 +23,18 @@ namespace Fuel\Core;
  */
 abstract class Controller_Hybrid extends \Controller_Rest
 {
-
 	/**
 	* @var string page template
 	*/
 	public $template = 'template';
 
 	/**
-	 * Load the template and create the $this->template object
+	 * Load the template and create the $this->template object if needed
 	 */
 	public function before()
 	{
-		if ( ! \Input::is_ajax())
+		// setup the template if this isn't a RESTful call
+		if ( ! $this->is_restful())
 		{
 			if ( ! empty($this->template) and is_string($this->template))
 			{
@@ -47,26 +47,76 @@ abstract class Controller_Hybrid extends \Controller_Rest
 	}
 
 	/**
+	 * router
+	 *
+	 * this router will call action methods for normal requests,
+	 * and REST methods for RESTful calls
+	 *
+	 * @param  string  $resource
+	 * @param  array   $arguments
+	 * @return mixed
+	 * @throws \HttpNotFoundException
+	 */
+	public function router($resource, $arguments)
+	{
+		// if this is an ajax call
+		if ($this->is_restful())
+		{
+			// have the Controller_Rest router deal with it
+			return parent::router($resource, $arguments);
+		}
+
+		// check if a input specific method exists
+		$controller_method = strtolower(\Input::method()) . '_' . $resource;
+
+		// fall back to action_ if no rest method is provided
+		if ( ! method_exists($this, $controller_method))
+		{
+			$controller_method = 'action_'.$resource;
+		}
+
+		// check if the action method exists
+		if (method_exists($this, $controller_method))
+		{
+			return call_fuel_func_array(array($this, $controller_method), $arguments);
+		}
+
+		// if not, we got ourselfs a genuine 404!
+		throw new \HttpNotFoundException();
+	}
+
+	/**
 	 * After controller method has run output the template
 	 *
 	 * @param  Response  $response
 	 */
 	public function after($response)
 	{
-		if ( ! \Input::is_ajax())
+		// return the template if no response is present and this isn't a RESTful call
+		if ( ! $this->is_restful())
 		{
-			// If nothing was returned default to the template
-			if (empty($response))
+			// do we have a response passed?
+			if ($response === null)
 			{
-				$response = $this->template;
+				// maybe one in the rest body?
+				$response = $this->response->body;
+				if ($response === null)
+				{
+					// fall back to the defined template
+					$response = $this->template;
+				}
 			}
 
-			// If the response isn't a Response object, embed in the available one for BC
-			// @deprecated  can be removed when $this->response is removed
+			// deal with returned array's in non-restful calls
+			elseif (is_array($response))
+			{
+				$response = \Format::forge()->to_json($response, true);
+			}
+
+			// and make sure we have a valid Response object
 			if ( ! $response instanceof Response)
 			{
-				$this->response->body = $response;
-				$response = $this->response;
+				$response = \Response::forge($response, $this->response_status);
 			}
 		}
 
@@ -74,34 +124,13 @@ abstract class Controller_Hybrid extends \Controller_Rest
 	}
 
 	/**
-	 * router
+	 * Decide whether to return RESTful or templated response
+	 * Override in subclass to introduce custom switching logic.
 	 *
-	 * requests are not made to methods directly The request will be for an "object".
-	 * this simply maps the object and method to the correct Controller method.
-	 *
-	 * this router will call action methods for normal requests,
-	 * and REST methods for RESTful calls
-	 *
-	 * @param  string
-	 * @param  array
+	 * @param  boolean
 	 */
-	public function router($resource, array $arguments)
+	public function is_restful()
 	{
-		// if this is an ajax call
-		if (\Input::is_ajax())
-		{
-			// have the Controller_Rest router deal with it
-			return parent::router($resource, $arguments);
-		}
-
-		// check if the action method exists
-		if (method_exists($this, 'action_'.$resource))
-		{
-			// if so, call the action
-			return call_user_func_array(array($this, 'action_'.$resource), $arguments);
-		}
-
-		// if not, we got ourselfs a genuine 404!
-		throw new \HttpNotFoundException();
+		return \Input::is_ajax();
 	}
 }

@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -22,7 +22,6 @@ namespace Fuel\Core;
  */
 class Event_Instance
 {
-
 	/**
 	 * @var	array	An array of listeners
 	 */
@@ -43,7 +42,6 @@ class Event_Instance
 		}
 	}
 
-
 	// --------------------------------------------------------------------
 
 	/**
@@ -51,9 +49,6 @@ class Event_Instance
 	 *
 	 * Registers a Callback for a given event
 	 *
-	 * @access	public
-	 * @param	string	The name of the event
-	 * @param	mixed	callback information
 	 * @return	void
 	 */
 	public function register()
@@ -94,15 +89,15 @@ class Event_Instance
 	 *
 	 * @param   string   $event     event to remove from
 	 * @param   mixed    $callback  callback to remove [optional, null for all]
-	 * @return  boolean  wether one or all callbacks have been removed
+	 * @return  boolean  whether one or all callbacks have been removed
 	 */
  	public function unregister($event, $callback = null)
 	{
 		if (isset($this->_events[$event]))
 		{
-			if ($callback === true)
+			if ($callback === null)
 			{
-				$this->_events = array();
+				unset($this->_events[$event]);
 				return true;
 			}
 
@@ -132,11 +127,10 @@ class Event_Instance
 	 * 'serialized'
 	 * 'string'
 	 *
-	 * @access	public
-	 * @param	string	 The name of the event
-	 * @param	mixed	 Any data that is to be passed to the listener
-	 * @param	string	 The return type
-	 * @param   boolean  Wether to fire events ordered LIFO instead of FIFO
+	 * @param	string	 $event			The name of the event
+	 * @param	mixed	 $data			Any data that is to be passed to the listener
+	 * @param	string	 $return_type	The return type
+	 * @param   boolean  $reversed		Whether to fire events ordered LIFO instead of FIFO
 	 * @return	mixed	 The return of the listeners, in the return type
 	 */
 	public function trigger($event, $data = '', $return_type = 'string', $reversed = false)
@@ -175,8 +169,7 @@ class Event_Instance
 	 *
 	 * Checks if the event has listeners
 	 *
-	 * @access	public
-	 * @param	string	The name of the event
+	 * @param	string	$event	The name of the event
 	 * @return	bool	Whether the event has listeners
 	 */
 	public function has_events($event)
@@ -195,9 +188,8 @@ class Event_Instance
 	 *
 	 * Formats the return in the given type
 	 *
-	 * @access	protected
-	 * @param	array	The array of returns
-	 * @param	string	The return type
+	 * @param	array	$calls			The array of returns
+	 * @param	string	$return_type	The return type
 	 * @return	mixed	The formatted return
 	 */
 	protected function _format_return(array $calls, $return_type)
@@ -211,7 +203,7 @@ class Event_Instance
 				return json_encode($calls);
 				break;
 			case 'none':
-				return;
+				return null;
 			case 'serialized':
 				return serialize($calls);
 				break;
@@ -227,8 +219,5 @@ class Event_Instance
 				return $calls;
 				break;
 		}
-
-		return false;
 	}
 }
-

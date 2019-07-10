@@ -1,36 +1,40 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 /**
- * NOTICE:
+ * -----------------------------------------------------------------------------
+ *  [!] NOTICE
+ * -----------------------------------------------------------------------------
  *
- * If you need to make modifications to the default configuration, copy
- * this file to your app/config folder, and make them in there.
+ *  If you need to make modifications to the default configuration,
+ *  copy this file to your 'app/config' folder, and make them in there.
  *
- * This will allow you to upgrade fuel without losing your custom config.
+ *  This will allow you to upgrade FuelPHP without losing your custom config.
+ *
  */
 
-
 return array(
-
 	/**
-	 * sources - The name of the main bootstrap file.
+	 * -------------------------------------------------------------------------
+	 *  Sources
+	 * -------------------------------------------------------------------------
 	 *
-	 * Set this to false or remove if you using mod_rewrite.
+	 *  The name of the main bootstrap file.
+	 *
+	 *  Set this to false or remove if you use 'mod_rewrite'.
+	 *
 	 */
+
 	'sources' => array(
 		'github.com/fuel-packages',
 	),
-
 );
-
-

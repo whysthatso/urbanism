@@ -1,4 +1,14 @@
 <?php
+/**
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
+ *
+ * @package    Fuel
+ * @version    1.8.2
+ * @author     Fuel Development Team
+ * @license    MIT License
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
+ */
 
 namespace Fuel\Core;
 
@@ -7,6 +17,9 @@ namespace Fuel\Core;
  */
 class Config_Yml extends \Config_File
 {
+	/**
+	 * @var  string  the extension used by this yaml file parser
+	 */
 	protected $ext = '.yml';
 
 	/**
@@ -24,7 +37,7 @@ class Config_Yml extends \Config_File
 	/**
 	 * Returns the formatted config file contents.
 	 *
-	 * @param   array   $content  config array
+	 * @param   array   $contents  config array
 	 * @return  string  formatted config file contents
 	 */
 	protected function export_format($contents)

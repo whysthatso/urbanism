@@ -1,19 +1,19 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
 
 /**
- * The Autloader is responsible for all class loading.  It allows you to define
+ * The Autoloader is responsible for all class loading.  It allows you to define
  * different load paths based on namespaces.  It also lets you set explicit paths
  * for classes to be loaded from.
  *
@@ -22,7 +22,6 @@ namespace Fuel\Core;
  */
 class Autoloader
 {
-
 	/**
 	 * @var  array  $classes  holds all the classes and paths
 	 */
@@ -45,7 +44,7 @@ class Autoloader
 	 * @var  array  list off namespaces of which classes will be aliased to global namespace
 	 */
 	protected static $core_namespaces = array(
-		'Fuel\\Core'
+		'Fuel\\Core',
 	);
 
 	/**
@@ -62,8 +61,9 @@ class Autoloader
 	 * Adds a namespace search path.  Any class in the given namespace will be
 	 * looked for in the given path.
 	 *
-	 * @param   string  the namespace
-	 * @param   string  the path
+	 * @param   string  $namespace  the namespace
+	 * @param   string  $path       the path
+	 * @param   bool    $psr        whether this is a PSR-0 compliant class
 	 * @return  void
 	 */
 	public static function add_namespace($namespace, $path, $psr = false)
@@ -78,8 +78,8 @@ class Autoloader
 	/**
 	 * Adds an array of namespace paths. See {add_namespace}.
 	 *
-	 * @param   array  the namespaces
-	 * @param   bool   whether to prepend the namespace to the search path
+	 * @param   array  $namespaces  the namespaces
+	 * @param   bool   $prepend     whether to prepend the namespace to the search path
 	 * @return  void
 	 */
 	public static function add_namespaces(array $namespaces, $prepend = false)
@@ -97,7 +97,7 @@ class Autoloader
 	/**
 	 * Returns the namespace's path or false when it doesn't exist.
 	 *
-	 * @param   string      the namespace to get the path for
+	 * @param   string      $namespace  the namespace to get the path for
 	 * @return  array|bool  the namespace path or false
 	 */
 	public static function namespace_path($namespace)
@@ -114,26 +114,26 @@ class Autoloader
 	 * Adds a classes load path.  Any class added here will not be searched for
 	 * but explicitly loaded from the path.
 	 *
-	 * @param   string  the class name
-	 * @param   string  the path to the class file
+	 * @param   string  $class  the class name
+	 * @param   string  $path   the path to the class file
 	 * @return  void
 	 */
 	public static function add_class($class, $path)
 	{
-		static::$classes[$class] = $path;
+		static::$classes[static::lower($class)] = $path;
 	}
 
 	/**
 	 * Adds multiple class paths to the load path. See {@see Autoloader::add_class}.
 	 *
-	 * @param   array  the class names and paths
+	 * @param   array  $classes  the class names and paths
 	 * @return  void
 	 */
 	public static function add_classes($classes)
 	{
 		foreach ($classes as $class => $path)
 		{
-			static::$classes[$class] = $path;
+			static::$classes[static::lower($class)] = $path;
 		}
 	}
 
@@ -170,14 +170,14 @@ class Autoloader
 	/**
 	 * Returns the class with namespace prefix when available
 	 *
-	 * @param	string
-	 * @return	bool|string
+	 * @param   string       $class
+	 * @return  bool|string
 	 */
 	protected static function find_core_class($class)
 	{
 		foreach (static::$core_namespaces as $ns)
 		{
-			if (array_key_exists($ns_class = $ns.'\\'.$class, static::$classes))
+			if (array_key_exists(static::lower($ns_class = $ns.'\\'.$class), static::$classes))
 			{
 				return $ns_class;
 			}
@@ -191,9 +191,9 @@ class Autoloader
 	 * will be auto-aliased to the global namespace.
 	 * Prefixing the classes will overwrite core classes and previously added namespaces.
 	 *
-	 * @param	string
-	 * @param	bool
-	 * @return	void
+	 * @param  string $namespace
+	 * @param  bool   $prefix
+	 * @return void
 	 */
 	public static function add_core_namespace($namespace, $prefix = true)
 	{
@@ -203,7 +203,7 @@ class Autoloader
 		}
 		else
 		{
-			array_push(static::$core_namespaces, $namespace);
+			static::$core_namespaces[] = $namespace;
 		}
 	}
 
@@ -224,26 +224,28 @@ class Autoloader
 
 		$loaded = false;
 		$class = ltrim($class, '\\');
-		$namespaced = ($pos = strripos($class, '\\')) !== false;
+		$pos = strripos($class, '\\');
 
 		if (empty(static::$auto_initialize))
 		{
 			static::$auto_initialize = $class;
 		}
 
-		if (array_key_exists($class, static::$classes))
+		if (isset(static::$classes[static::lower($class)]))
 		{
-			include str_replace('/', DS, static::$classes[$class]);
-			static::init_class($class);
+			static::init_class($class, str_replace('/', DS, static::$classes[static::lower($class)]));
 			$loaded = true;
 		}
 		elseif ($full_class = static::find_core_class($class))
 		{
 			if ( ! class_exists($full_class, false) and ! interface_exists($full_class, false))
 			{
-				include static::prep_path(static::$classes[$full_class]);
+				include static::prep_path(static::$classes[static::lower($full_class)]);
 			}
-			class_alias($full_class, $class);
+			if ( ! class_exists($class, false))
+			{
+				class_alias($full_class, $class);
+			}
 			static::init_class($class);
 			$loaded = true;
 		}
@@ -264,8 +266,7 @@ class Autoloader
 						);
 						if (is_file($path))
 						{
-							require $path;
-							static::init_class($class);
+							static::init_class($class, $path);
 							$loaded = true;
 							break;
 						}
@@ -275,12 +276,11 @@ class Autoloader
 
 			if ( ! $loaded)
 			{
-				$path = APPPATH.'classes/'.static::class_to_path($class);
+				$path = APPPATH.'classes'.DS.static::class_to_path($class);
 
-				if (file_exists($path))
+				if (is_file($path))
 				{
-					include $path;
-					static::init_class($class);
+					static::init_class($class, $path);
 					$loaded = true;
 				}
 			}
@@ -293,6 +293,18 @@ class Autoloader
 		}
 
 		return $loaded;
+	}
+
+	/**
+	 * Reset the auto initialize state after an autoloader exception.
+	 * This method is called by the exception handler, and is considered an
+	 * internal method!
+	 *
+	 * @access protected
+	 */
+	public static function _reset()
+	{
+		static::$auto_initialize = null;
 	}
 
 	/**
@@ -319,7 +331,7 @@ class Autoloader
 
 		if ( ! $psr)
 		{
-			$file = strtolower($file);
+			$file = static::lower($file);
 		}
 
 		return $file;
@@ -340,17 +352,69 @@ class Autoloader
 	 * Checks to see if the given class has a static _init() method.  If so then
 	 * it calls it.
 	 *
-	 * @param	string	the class name
+	 * @param string $class the class name
+	 * @param string $file  the file containing the class to include
+	 * @throws \Exception
+	 * @throws \FuelException
 	 */
-	protected static function init_class($class)
+	protected static function init_class($class, $file = null)
 	{
-		if (static::$auto_initialize === $class)
+		// include the file if needed
+		if ($file)
 		{
-			static::$auto_initialize = null;
-			if (method_exists($class, '_init') and is_callable($class.'::_init'))
+			include $file;
+		}
+
+		// if the loaded file contains a class...
+		if (class_exists($class, false))
+		{
+			// call the classes static init if needed
+			if (static::$auto_initialize === $class)
 			{
-				call_user_func($class.'::_init');
+				static::$auto_initialize = null;
+				if (method_exists($class, '_init') and is_callable($class.'::_init'))
+				{
+					call_user_func($class.'::_init');
+				}
 			}
 		}
+
+		// or an interface...
+		elseif (interface_exists($class, false))
+		{
+			// nothing to do here
+		}
+
+		// or a trait if you're not on 5.3 anymore...
+		elseif (function_exists('trait_exists') and trait_exists($class, false))
+		{
+			// nothing to do here
+		}
+
+		// else something went wrong somewhere, barf and exit now
+		elseif ($file)
+		{
+			throw new \Exception('File "'.\Fuel::clean_path($file).'" does not contain class "'.$class.'"');
+		}
+		else
+		{
+			throw new \FuelException('Class "'.$class.'" is not defined');
+		}
+	}
+
+	/**
+	 * deal with multibyte strings depending on the configuration
+	 * (copy of Str::lower(), but external dependancies don't work in this class)
+	 *
+	 * @param   string  $str	string to convert to lowercase
+	 * @return  string  converted string
+	 */
+	protected static function lower($str)
+	{
+		$encoding = class_exists('Fuel', false) ? \Fuel::$encoding : 'UTF-8';
+
+		return MBSTRING
+			? mb_strtolower($str, $encoding)
+			: strtolower($str);
 	}
 }

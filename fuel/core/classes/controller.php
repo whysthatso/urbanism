@@ -1,29 +1,33 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
 
 abstract class Controller
 {
-
 	/**
 	 * @var  Request  The current Request object
 	 */
 	public $request;
 
 	/**
+	 * @var  Integer  The default response status
+	 */
+	public $response_status = 200;
+
+	/**
 	 * Sets the controller request object.
 	 *
-	 * @param   Request   The current request object
+	 * @param   \Request $request  The current request object
 	 */
 	public function __construct(\Request $request)
 	{
@@ -37,13 +41,15 @@ abstract class Controller
 
 	/**
 	 * This method gets called after the action is called
+	 * @param \Response|string $response
+	 * @return \Response
 	 */
 	public function after($response)
 	{
 		// Make sure the $response is a Response object
-		if ( ! $response instanceof \Response)
+		if ( ! $response instanceof Response)
 		{
-			$response = \Response::forge($response);
+			$response = \Response::forge($response, $this->response_status);
 		}
 
 		return $response;
@@ -72,4 +78,3 @@ abstract class Controller
 		return $this->request->params();
 	}
 }
-

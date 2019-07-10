@@ -1,22 +1,19 @@
 <?php
 /**
- * Fuel
- *
- * Fuel is a fast, lightweight, community driven PHP5 framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Parser;
 
 class View extends \Fuel\Core\View
 {
-
 	/**
 	 * @var  array  Holds the list of loaded files.
 	 */
@@ -53,23 +50,42 @@ class View extends \Fuel\Core\View
 	 */
 	public static function forge($file = null, $data = null, $auto_encode = null)
 	{
-		$extension = pathinfo($file, PATHINFO_EXTENSION);
-		$class     = \Config::get('parser.extensions.'.$extension, get_called_class());
+		$class = null;
 
-		// Only get rid of the extension if it is not an absolute file path
-		if ($file[0] !== '/' and $file[1] !== ':')
+		// if a view file was given
+		if ($file !== null)
 		{
-			$file = $extension ? preg_replace('/\.'.preg_quote($extension).'$/i', '', $file) : $file;
+			// get its type and check if a parser extension is defined
+			$extension = pathinfo($file, PATHINFO_EXTENSION);
+			$class = \Config::get('parser.extensions.'.$extension, null);
+
+			// Only get rid of the extension if it is not an absolute file path
+			if ($file[0] !== '/' and $file[1] !== ':')
+			{
+				$file = $extension ? preg_replace('/\.'.preg_quote($extension).'$/i', '', $file) : $file;
+			}
 		}
 
-		// Class can be an array config
-		if (is_array($class))
+		// if no extension is defined, use the called class
+		if ($class === null)
+		{
+			$class = get_called_class();
+		}
+
+		// class can also be an array config
+		elseif (is_array($class))
 		{
 			$class['extension'] and $extension = $class['extension'];
 			$class = $class['class'];
 		}
 
-		// Include necessary files
+		// if no auto-encode flag is given, get it from config
+		if ($auto_encode === null)
+		{
+			$auto_encode = \Config::get('parser.'.$class.'.auto_encode', null);
+		}
+
+		// include necessary parser files
 		foreach ((array) \Config::get('parser.'.$class.'.include', array()) as $include)
 		{
 			if ( ! array_key_exists($include, static::$loaded_files))
@@ -79,20 +95,19 @@ class View extends \Fuel\Core\View
 			}
 		}
 
-		// Instantiate the Parser class without auto-loading the view file
-		if ($auto_encode === null)
-		{
-			$auto_encode = \Config::get('parser.'.$class.'.auto_encode', null);
-		}
-
+		// instantiate the Parser class without auto-loading the view file
 		$view = new $class(null, $data, $auto_encode);
 
-		// Set extension when given
-		$extension and $view->extension = $extension;
+		// if we have a view file, set it
+		if ($file)
+		{
+			// Set extension when given
+			empty($extension) or $view->extension = $extension;
 
-		// Load the view file
-		$view->set_filename($file);
+			$view->set_filename($file, true);
+		}
 
+		// and return the view object
 		return $view;
 	}
 }

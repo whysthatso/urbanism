@@ -1,21 +1,19 @@
 <?php
 /**
- * Database object creation helper methods.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
- * @package    Fuel/Database
- * @category   Base
- * @author     Kohana Team
- * @copyright  (c) 2009 Kohana Team
- * @license    http://kohanaphp.com/license
+ * @package    Fuel
+ * @version    1.8.2
+ * @author     Fuel Development Team
+ * @license    MIT License
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
 
-
-
 class DB
 {
-
 	// Query types
 	const SELECT =  1;
 	const INSERT =  2;
@@ -23,7 +21,6 @@ class DB
 	const DELETE =  4;
 
 	public static $query_count = 0;
-
 
 	/**
 	 * Create a new [Database_Query] of the given type.
@@ -39,8 +36,8 @@ class DB
 	 * `DB::INSERT` queries will return the insert id and number of rows.
 	 * For all other queries, the number of affected rows is returned.
 	 *
-	 * @param   integer  type: DB::SELECT, DB::UPDATE, etc
 	 * @param   string   SQL statement
+	 * @param   integer  type: DB::SELECT, DB::UPDATE, etc
 	 * @return  Database_Query
 	 */
 	public static function query($sql, $type = null)
@@ -58,6 +55,26 @@ class DB
 		return \Database_Connection::instance($db)->last_query;
 	}
 
+	/*
+	 * Returns the DB drivers error info
+	 *
+	 * @return	mixed	the DB drivers error info
+	 */
+	public static function error_info($db = null)
+	{
+		return \Database_Connection::instance($db)->error_info();
+	}
+
+	/*
+	 * Returns a database instance
+	 *
+	 * @return	Database_Connection
+	 */
+	public static function instance($db = null)
+	{
+		return \Database_Connection::instance($db);
+	}
+
 	/**
 	 * Create a new [Database_Query_Builder_Select]. Each argument will be
 	 * treated as a column. To generate a `foo AS bar` alias, use an array.
@@ -72,9 +89,9 @@ class DB
 	 * @param   ...
 	 * @return  Database_Query_Builder_Select
 	 */
-	public static function select($columns = NULL)
+	public static function select($args = null)
 	{
-		return new \Database_Query_Builder_Select(func_get_args());
+		return \Database_Connection::instance(null, null, false)->select(func_get_args());
 	}
 
 	/**
@@ -86,9 +103,9 @@ class DB
 	 * @param   array   columns to select
 	 * @return  Database_Query_Builder_Select
 	 */
-	public static function select_array(array $columns = NULL)
+	public static function select_array(array $columns = null)
 	{
-		return new \Database_Query_Builder_Select($columns);
+		return \Database_Connection::instance(null, null, false)->select($columns);
 	}
 
 	/**
@@ -101,9 +118,9 @@ class DB
 	 * @param   array   list of column names or array($column, $alias) or object
 	 * @return  Database_Query_Builder_Insert
 	 */
-	public static function insert($table = NULL, array $columns = NULL)
+	public static function insert($table = null, array $columns = null)
 	{
-		return new \Database_Query_Builder_Insert($table, $columns);
+		return \Database_Connection::instance()->insert($table, $columns);
 	}
 
 	/**
@@ -115,9 +132,9 @@ class DB
 	 * @param   string  table to update
 	 * @return  Database_Query_Builder_Update
 	 */
-	public static function update($table = NULL)
+	public static function update($table = null)
 	{
-		return new \Database_Query_Builder_Update($table);
+		return \Database_Connection::instance()->update($table);
 	}
 
 	/**
@@ -129,9 +146,9 @@ class DB
 	 * @param   string  table to delete from
 	 * @return  Database_Query_Builder_Delete
 	 */
-	public static function delete($table = NULL)
+	public static function delete($table = null)
 	{
-		return new \Database_Query_Builder_Delete($table);
+		return \Database_Connection::instance()->delete($table);
 	}
 
 	/**
@@ -140,12 +157,27 @@ class DB
 	 *
 	 *     $expression = DB::expr('COUNT(users.id)');
 	 *
-	 * @param   string  expression
+	 * @param   string $string expression
 	 * @return  Database_Expression
 	 */
 	public static function expr($string)
 	{
 		return new \Database_Expression($string);
+	}
+
+	/**
+	 * Create a new [Database_Expression] containing a quoted identifier. An expression
+	 * is the only way to use SQL functions within query builders.
+	 *
+	 *     $expression = DB::identifier('users.id');	// returns `users`.`id` for MySQL
+	 *
+	 * @param	string	$string	the string to quote
+	 * @param	string	$db		the database connection to use
+	 * @return	Database_Expression
+	 */
+	public static function identifier($string, $db = null)
+	{
+		return new \Database_Expression(static::quote_identifier($string, $db));
 	}
 
 	/**
@@ -234,6 +266,26 @@ class DB
 	}
 
 	/**
+	 * Lists all of the indexes in a table. Optionally, a LIKE string can be
+	 * used to search for specific indexes by name.
+	 *
+	 *     // Get all indexes from the "users" table
+	 *     $indexes = $db->list_indexes('users');
+	 *
+	 *     // Get all name-related columns
+	 *     $indexes = $db->list_indexes('users', '%name%');
+	 *
+	 * @param   string $table table to get indexes from
+	 * @param   string $like  index names to search for
+	 * @param   string  the database connection to use
+	 * @return  array
+	 */
+	public static function list_indexes($table, $like = null, $db = null)
+	{
+		return \Database_Connection::instance($db, null, false)->list_indexes($table, $like);
+	}
+
+	/**
 	 * Lists all of the columns in a table. Optionally, a LIKE string can be
 	 * used to search for specific fields.
 	 *
@@ -250,7 +302,7 @@ class DB
 	 */
 	public static function list_columns($table = null, $like = null, $db = null)
 	{
-		return \Database_Connection::instance($db)->list_columns($table, $like);
+		return \Database_Connection::instance($db, null, false)->list_columns($table, $like);
 	}
 
 	/**
@@ -263,7 +315,7 @@ class DB
 	 */
 	public static function list_tables($like = null, $db = null)
 	{
-		return \Database_Connection::instance($db)->list_tables($like);
+		return \Database_Connection::instance($db, null, false)->list_tables($like);
 	}
 
 	/**
@@ -277,7 +329,7 @@ class DB
 	 */
 	public static function datatype($type, $db = null)
 	{
-		return \Database_Connection::instance($db)->datatype($type);
+		return \Database_Connection::instance($db, null, false)->datatype($type);
 	}
 
 		/**
@@ -292,7 +344,7 @@ class DB
 	 */
 	public static function count_records($table, $db = null)
 	{
-		return \Database_Connection::instance($db)->count_records($table);
+		return \Database_Connection::instance($db, null, false)->count_records($table);
 	}
 
 	/**
@@ -306,7 +358,7 @@ class DB
 	 */
 	public static function count_last_query($db = null)
 	{
-		return \Database_Connection::instance($db)->count_last_query();
+		return \Database_Connection::instance($db, null, false)->count_last_query();
 	}
 
 	/**
@@ -364,16 +416,22 @@ class DB
 	}
 
 	/**
-	 * Rollsback all pending transactional queries
+	 * Rollsback pending transactional queries
+	 * Rollback to the current level uses SAVEPOINT,
+	 * it does not work if current RDBMS does not support them.
+	 * In this case system rollsback all queries and closes the transaction
 	 *
 	 *     DB::rollback_transaction();
 	 *
-	 * @param   string  db connection
+	 * @param   string  $db connection
+	 * @param   bool    $rollback_all:
+	 *             true  - rollback everything and close transaction;
+	 *             false - rollback only current level
 	 * @return  bool
 	 */
-	public static function rollback_transaction($db = null)
+	public static function rollback_transaction($db = null, $rollback_all = true)
 	{
-		return \Database_Connection::instance($db)->rollback_transaction();
+		return \Database_Connection::instance($db)->rollback_transaction($rollback_all);
 	}
 
 }

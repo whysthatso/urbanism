@@ -1,17 +1,17 @@
 <?php
 /**
- * MySQLi database connection.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
- * @package    Fuel/Database
- * @category   Drivers
- * @author     Kohana Team
- * @copyright  (c) 2008-2009 Kohana Team
- * @license    http://kohanaphp.com/license
+ * @package    Fuel
+ * @version    1.8.2
+ * @author     Fuel Development Team
+ * @license    MIT License
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @copyright  2008 - 2009 Kohana Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
-
-
 
 class Database_MySQLi_Connection extends \Database_Connection
 {
@@ -41,14 +41,32 @@ class Database_MySQLi_Connection extends \Database_Connection
 	protected $_identifier = '`';
 
 	/**
-	 * @var  bool  Allows transactions
-	 */
-	protected $_in_transaction = false;
-
-	/**
 	 * @var  string  Which kind of DB is used
 	 */
 	public $_db_type = 'mysql';
+
+	/**
+	 * @param string $name
+	 * @param array  $config
+	 */
+	protected function __construct($name, array $config)
+	{
+		// construct a custom schema driver
+//		$this->_schema = new \Database_Drivername_Schema($name, $this);
+
+		// call the parent consructor
+		parent::__construct($name, $config);
+
+		// make sure we have all connection parameters, add defaults for those missing
+		$this->_config = \Arr::merge(array(
+			'connection'  => array(
+				'socket'     => '',
+				'port'       => '',
+				'compress'   => false,
+			),
+			'enable_cache'   => true,
+		), $this->_config);
+	}
 
 	public function connect()
 	{
@@ -65,19 +83,7 @@ class Database_MySQLi_Connection extends \Database_Connection
 		}
 
 		// Extract the connection parameters, adding required variables
-		extract($this->_config['connection'] + array(
-			'database'   => '',
-			'hostname'   => '',
-			'port'       => '',
-			'socket'     => '',
-			'username'   => '',
-			'password'   => '',
-			'persistent' => false,
-			'compress'	 => true,
-		));
-
-		// Prevent this information from showing up in traces
-		unset($this->_config['connection']['username'], $this->_config['connection']['password']);
+		extract($this->_config['connection']);
 
 		try
 		{
@@ -94,40 +100,26 @@ class Database_MySQLi_Connection extends \Database_Connection
 				$socket = null;
 				$port   = null;
 			}
-			if ($persistent)
-			{
-				// Create a persistent connection
-				if ($compress)
-				{
-					$mysqli = mysqli_init();
-					$mysqli->real_connect('p:'.$hostname, $username, $password, $database, $port, $socket, MYSQLI_CLIENT_COMPRESS);
 
-					$this->_connection = $mysqli;
-				}
-				else
-				{
-					$this->_connection = new \MySQLi('p:'.$hostname, $username, $password, $database, $port, $socket);
-				}
-			}
-			else
-			{
-				// Create a connection and force it to be a new link
-				if ($compress)
-				{
-					$mysqli = mysqli_init();
-					$mysqli->real_connect($hostname, $username, $password, $database, $port, $socket, MYSQLI_CLIENT_COMPRESS);
+            $host = ($persistent) ? 'p:'.$hostname : $hostname;
 
-					$this->_connection = $mysqli;
-				}
-				else
-				{
-					$this->_connection = new \MySQLi($hostname, $username, $password, $database, $port, $socket);
-				}
-			}
+            // Create a connection and force it to be a new link
+            if ($compress)
+            {
+                $mysqli = mysqli_init();
+                $mysqli->real_connect($host, $username, $password, $database, $port, $socket, MYSQLI_CLIENT_COMPRESS);
+
+                $this->_connection = $mysqli;
+            }
+            else
+            {
+                $this->_connection = new \MySQLi($host, $username, $password, $database, $port, $socket);
+            }
+
 			if ($this->_connection->error)
 			{
 				// Unable to connect, select database, etc
-				throw new \Database_Exception($this->_connection->error, $this->_connection->errno);
+				throw new \Database_Exception(str_replace($password, str_repeat('*', 10), $this->_connection->error), $this->_connection->errno, null, $this->_connection->errno);
 			}
 		}
 		catch (\ErrorException $e)
@@ -135,7 +127,7 @@ class Database_MySQLi_Connection extends \Database_Connection
 			// No connection exists
 			$this->_connection = null;
 
-			throw new \Database_Exception('No MySQLi Connection', 0);
+			throw new \Database_Exception(str_replace($password, str_repeat('*', 10), $e->getMessage()), $e->getCode(), $e, $e->getCode());
 		}
 
 		// \xFF is a better delimiter, but the PHP driver uses underscore
@@ -163,13 +155,18 @@ class Database_MySQLi_Connection extends \Database_Connection
 			if ($this->_connection->select_db($database) !== true)
 			{
 				// Unable to select database
-				throw new \Database_Exception($this->_connection->error, $this->_connection->errno);
+				throw new \Database_Exception($this->_connection->error, $this->_connection->errno, null, $this->_connection->errno);
 			}
 		}
 
 		static::$_current_databases[$this->_connection_id] = $database;
 	}
 
+	/**
+	 * Disconnect from the database
+	 *
+	 * @throws  \Exception  when the mysql database is not disconnected properly
+	 */
 	public function disconnect()
 	{
 		try
@@ -179,7 +176,15 @@ class Database_MySQLi_Connection extends \Database_Connection
 
 			if ($this->_connection instanceof \MySQLi)
 			{
-				$status = $this->_connection->close();
+				if ($status = $this->_connection->close())
+				{
+					// clear the connection
+					$this->_connection = null;
+
+					// and reset the savepoint depth
+					$this->_transaction_depth = 0;
+				}
+
 			}
 		}
 		catch (\Exception $e)
@@ -199,19 +204,42 @@ class Database_MySQLi_Connection extends \Database_Connection
 
 		if ($status === false)
 		{
-			throw new \Database_Exception($this->_connection->error, $this->_connection->errno);
+			throw new \Database_Exception($this->_connection->error, $this->_connection->errno, null, $this->_connection->errno);
 		}
 	}
 
-	public function query($type, $sql, $as_object)
+	/**
+	 * Perform an SQL query of the given type.
+	 *
+	 *     // Make a SELECT query and use objects for results
+	 *     $db->query(static::SELECT, 'SELECT * FROM groups', true);
+	 *
+	 *     // Make a SELECT query and use "Model_User" for the results
+	 *     $db->query(static::SELECT, 'SELECT * FROM users LIMIT 1', 'Model_User');
+	 *
+	 * @param   integer $type       query type (\DB::SELECT, \DB::INSERT, etc.)
+	 * @param   string  $sql        SQL string
+	 * @param   mixed   $as_object  used when query type is SELECT
+	 * @param   bool    $caching    whether or not the result should be stored in a caching iterator
+	 *
+ 	 * @return  mixed  when SELECT then return an iterator of results,<br>
+	 *                 when INSERT then return a list of insert id and rows created,<br>
+	 *                 in other case return the number of rows affected
+	 *
+	 * @throws \Database_Exception
+	 */
+	public function query($type, $sql, $as_object, $caching = null)
 	{
+		// If no custom caching is given, use the global setting
+		is_null($caching) and $caching = $this->_config['enable_cache'];
+
 		// Make sure the database is connected
 		if ($this->_connection)
 		{
 			// Make sure the connection is still alive
 			if ( ! $this->_connection->ping())
 			{
-				throw new \Database_Exception($this->_connection->error.' [ '.$sql.' ]', $this->_connection->errno);
+				throw new \Database_Exception($this->_connection->error.' [ '.$sql.' ]', $this->_connection->errno, null, $this->_connection->errno);
 			}
 		}
 		else
@@ -219,10 +247,40 @@ class Database_MySQLi_Connection extends \Database_Connection
 			$this->connect();
 		}
 
-		if ( ! empty($this->_config['profiling']))
+		if (\Fuel::$profiling and ! empty($this->_config['profiling']))
 		{
-			// Benchmark this query for the current instance
-			$benchmark = \Profiler::start("Database ({$this->_instance})", $sql);
+			// Get the paths defined in config
+			$paths = \Config::get('profiling_paths');
+
+			// Storage for the trace information
+			$stacktrace = array();
+
+			// Get the execution trace of this query
+			$include = false;
+			foreach (debug_backtrace() as $index => $page)
+			{
+				// Skip first entry and entries without a filename
+				if ($index > 0 and empty($page['file']) === false)
+				{
+					// Checks to see what paths you want backtrace
+					foreach($paths as $index => $path)
+					{
+						if (strpos($page['file'], $path) !== false)
+						{
+							$include = true;
+							break;
+						}
+					}
+
+					// Only log if no paths we defined, or we have a path match
+					if ($include or empty($paths))
+					{
+						$stacktrace[] = array('file' => \Fuel::clean_path($page['file']), 'line' => $page['line']);
+					}
+				}
+			}
+
+			$benchmark = \Profiler::start($this->_instance, $sql, $stacktrace);
 		}
 
 		if ( ! empty($this->_config['connection']['persistent']) and $this->_config['connection']['database'] !== static::$_current_databases[$this->_connection_id])
@@ -232,7 +290,7 @@ class Database_MySQLi_Connection extends \Database_Connection
 		}
 
 		// Execute the query
-		if (($result = $this->_connection->query($sql)) === false)
+		if (($result = $this->_connection->query($sql, $caching ? MYSQLI_STORE_RESULT :MYSQLI_USE_RESULT)) === false)
 		{
 			if (isset($benchmark))
 			{
@@ -240,7 +298,7 @@ class Database_MySQLi_Connection extends \Database_Connection
 				\Profiler::delete($benchmark);
 			}
 
-			throw new \Database_Exception($this->_connection->error.' [ '.$sql.' ]', $this->_connection->errno);
+			throw new \Database_Exception($this->_connection->error.' [ '.$sql.' ]', $this->_connection->errno, null, $this->_connection->errno);
 		}
 
 		// check for multiresults, we don't support those at the moment
@@ -262,8 +320,16 @@ class Database_MySQLi_Connection extends \Database_Connection
 
 		if ($type === \DB::SELECT)
 		{
-			// Return an iterator of results
-			return new \Database_MySQLi_Result($result, $sql, $as_object);
+			if ($caching)
+			{
+				// Return an iterator of results
+				return new \Database_MySQLi_Cached($result, $sql, $as_object);
+			}
+			else
+			{
+				// Return an iterator of results
+				return new \Database_MySQLi_Result($result, $sql, $as_object);
+			}
 		}
 		elseif ($type === \DB::INSERT)
 		{
@@ -273,17 +339,41 @@ class Database_MySQLi_Connection extends \Database_Connection
 				$this->_connection->affected_rows,
 			);
 		}
-		else
+		elseif ($type === \DB::UPDATE or $type === \DB::DELETE)
 		{
 			// Return the number of rows affected
 			return $this->_connection->affected_rows;
 		}
+
+		return $result;
 	}
 
+	/**
+	 * Returns a database cache object
+	 *
+	 *     $db->cache($result, $sql);
+	 *
+	 * @param  array   $result
+	 * @param  string  $sql
+	 * @param  mixed   $as_object
+	 *
+	 * @return  Database_Cached
+	 */
+	public function cache($result, $sql, $as_object = null)
+	{
+		return new \Database_MySQLi_Cached($result, $sql, $as_object);
+	}
+
+	/**
+	 * Resolve a datatype
+	 *
+	 * @param integer $type
+	 *
+	 * @return array
+	 */
 	public function datatype($type)
 	{
-		static $types = array
-		(
+		static $types = array(
 			'blob'                      => array('type' => 'string', 'binary' => true, 'character_maximum_length' => '65535'),
 			'bool'                      => array('type' => 'bool'),
 			'bigint unsigned'           => array('type' => 'int', 'min' => '0', 'max' => '18446744073709551615'),
@@ -316,17 +406,26 @@ class Database_MySQLi_Connection extends \Database_Connection
 			'tinyint'                   => array('type' => 'int', 'min' => '-128', 'max' => '127'),
 			'tinyint unsigned'          => array('type' => 'int', 'min' => '0', 'max' => '255'),
 			'tinytext'                  => array('type' => 'string', 'character_maximum_length' => '255'),
+			'varchar'                   => array('type' => 'string', 'exact' => true),
 			'year'                      => array('type' => 'string'),
 		);
 
 		$type = str_replace(' zerofill', '', $type);
 
 		if (isset($types[$type]))
+		{
 			return $types[$type];
+		}
 
 		return parent::datatype($type);
 	}
 
+	/**
+	 * List tables
+	 *
+	 * @param   string  $like   pattern of table name
+	 * @return  array   array of table names
+	 */
 	public function list_tables($like = null)
 	{
 		if (is_string($like))
@@ -349,6 +448,13 @@ class Database_MySQLi_Connection extends \Database_Connection
 		return $tables;
 	}
 
+	/**
+	 * List table columns
+	 *
+	 * @param   string  $table  table name
+	 * @param   string  $like   column name pattern
+	 * @return  array   array of column structure
+	 */
 	public function list_columns($table, $like = null)
 	{
 		// Quote the table name
@@ -433,6 +539,56 @@ class Database_MySQLi_Connection extends \Database_Connection
 		return $columns;
 	}
 
+	/**
+	 * List indexes
+	 *
+	 * @param string $like
+	 *
+	 * @throws \FuelException
+	 */
+	public function list_indexes($table, $like = null)
+	{
+		// Quote the table name
+		$table = $this->quote_table($table);
+
+		if (is_string($like))
+		{
+			// Search for index names
+			$result = $this->query(\DB::SELECT, 'SHOW INDEX FROM '.$table.' WHERE '.$this->quote_identifier('Key_name').' LIKE '.$this->quote($like), false);
+		}
+		else
+		{
+			// Find all index names
+			$result = $this->query(\DB::SELECT, 'SHOW INDEX FROM '.$table, false);
+		}
+
+		// unify the result
+		$indexes = array();
+		foreach ($result as $row)
+		{
+			$index = array(
+				'name' => $row['Key_name'],
+				'column' => $row['Column_name'],
+				'order' => $row['Seq_in_index'],
+				'type' => $row['Index_type'],
+				'primary' => $row['Key_name'] == 'PRIMARY' ? true : false,
+				'unique' => $row['Non_unique'] == 0 ? true : false,
+				'null' => $row['Null'] == 'YES' ? true : false,
+				'ascending' => $row['Collation'] == 'A' ? true : false,
+			);
+
+			$indexes[] = $index;
+		}
+
+		return $indexes;
+	}
+
+	/**
+	 * Escape query for sql
+	 *
+	 * @param   mixed   $value  value of string castable
+	 * @return  string  escaped sql string
+	 */
 	public function escape($value)
 	{
 		// Make sure the database is connected
@@ -440,39 +596,70 @@ class Database_MySQLi_Connection extends \Database_Connection
 
 		if (($value = $this->_connection->real_escape_string((string) $value)) === false)
 		{
-			throw new \Database_Exception($this->_connection->error, $this->_connection->errno);
+			throw new \Database_Exception($this->_connection->error, $this->_connection->errno, null, $this->_connection->errno);
 		}
 
 		// SQL standard is to use single-quotes for all values
 		return "'$value'";
 	}
 
-	public function in_transaction()
+	public function error_info()
 	{
-		return $this->_in_transaction;
+		$errno = $this->_connection->errno;
+		return array($errno, empty($errno) ? null : $errno, empty($errno) ? null : $this->_connection->error);
 	}
 
-	public function start_transaction()
+	protected function driver_start_transaction()
 	{
-		$this->query(0, 'SET AUTOCOMMIT=0', false);
 		$this->query(0, 'START TRANSACTION', false);
-		$this->_in_transaction = true;
 		return true;
 	}
 
-	public function commit_transaction()
+	protected function driver_commit()
 	{
 		$this->query(0, 'COMMIT', false);
-		$this->query(0, 'SET AUTOCOMMIT=1', false);
-		$this->_in_transaction = false;
 		return true;
 	}
 
-	public function rollback_transaction()
+	protected function driver_rollback()
 	{
 		$this->query(0, 'ROLLBACK', false);
-		$this->query(0, 'SET AUTOCOMMIT=1', false);
-		$this->_in_transaction = false;
+		return true;
+	}
+
+	/**
+	 * Sets savepoint of the transaction
+	 *
+	 * @param string $name name of the savepoint
+	 * @return boolean true  - savepoint was set successfully;
+	 *                 false - failed to set savepoint;
+	 */
+	protected function set_savepoint($name) {
+		$this->query(0, 'SAVEPOINT LEVEL'.$name, false);
+		return true;
+	}
+
+	/**
+	 * Release savepoint of the transaction
+	 *
+	 * @param string $name name of the savepoint
+	 * @return boolean true  - savepoint was set successfully;
+	 *                 false - failed to set savepoint;
+	 */
+	protected function release_savepoint($name) {
+		$this->query(0, 'RELEASE SAVEPOINT LEVEL'.$name, false);
+		return true;
+	}
+
+	/**
+	 * Rollback savepoint of the transaction
+	 *
+	 * @param string $name name of the savepoint
+	 * @return boolean true  - savepoint was set successfully;
+	 *                 false - failed to set savepoint;
+	 */
+	protected function rollback_savepoint($name) {
+		$this->query(0, 'ROLLBACK TO SAVEPOINT LEVEL'.$name, false);
 		return true;
 	}
 

@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -31,7 +31,7 @@ class Test_Security extends TestCase
 		$expected = '&quot;H&amp;M&quot;';
 		$this->assertEquals($expected, $output);
 	}
-	
+
 	/**
 	* Tests Security::htmlentities()
 	*
@@ -43,7 +43,7 @@ class Test_Security extends TestCase
 		$expected = '&#039;';
 		$this->assertEquals($expected, $output);
 	}
-	
+
 	/**
 	* Tests Security::htmlentities()
 	*
@@ -55,7 +55,7 @@ class Test_Security extends TestCase
 		$expected = 'You must write &amp; as &amp;';
 		$this->assertEquals($expected, $output);
 	}
-	
+
 	/**
 	* Tests Security::htmlentities()
 	*
@@ -65,14 +65,14 @@ class Test_Security extends TestCase
 	{
 		$config = \Config::get('security.htmlentities_double_encode');
 		\Config::set('security.htmlentities_double_encode', true);
-		
+
 		$output = Security::htmlentities('You must write & as &amp;');
 		$expected = 'You must write &amp; as &amp;amp;';
 		$this->assertEquals($expected, $output);
-		
+
 		\Config::set('security.htmlentities_double_encode', $config);
 	}
-	
+
 	/**
 	* Tests Security::htmlentities()
 	*
@@ -85,4 +85,43 @@ class Test_Security extends TestCase
 		$expected = '&quot;H&amp;M&quot;';
 		$this->assertEquals($expected, $output);
 	}
+
+	/**
+	* Tests Security::clean()
+	*
+	* @test
+	*/
+	public function test_clean()
+	{
+		// test correct recursive cleaning
+		$input = array(
+			array(' level1 '),
+			array(
+				array(' level2 '),
+				array(
+					array(' level3 '),
+					array(
+						array(' level4 '),
+					),
+				),
+			),
+		);
+
+		$expected = array(
+			array('level1'),
+			array(
+				array('level2'),
+				array(
+					array('level3'),
+					array(
+						array('level4'),
+					),
+				),
+			),
+		);
+
+		$output = Security::clean($input, array('trim'));
+		$this->assertEquals($expected, $output);
+	}
+
 }

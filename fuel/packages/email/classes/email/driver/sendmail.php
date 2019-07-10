@@ -1,13 +1,13 @@
 <?php
 /**
- * Fuel is a fast, lightweight, community driven PHP5 framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Email;
@@ -18,11 +18,13 @@ class SendmailFailedException extends \EmailSendingFailedException {}
 
 class Email_Driver_Sendmail extends \Email_Driver
 {
-
 	/**
 	 * Initalted all needed for Sendmail mailing.
 	 *
-	 * @return	bool	success boolean
+	 * @throws \SendmailConnectionException Could not open a sendmail connection
+	 * @throws \SendmailFailedException     Failed sending email through sendmail
+	 *
+	 * @return  bool    Success boolean
 	 */
 	protected function _send()
 	{
@@ -30,7 +32,8 @@ class Email_Driver_Sendmail extends \Email_Driver
 		$message = $this->build_message();
 
 		// Open a connection
-		$handle = @popen($this->config['sendmail_path'] . " -oi -f ".$this->config['from']['email']." -t", 'w');
+		$return_path = ($this->config['return_path'] !== false) ? $this->config['return_path'] : $this->config['from']['email'];
+		$handle = @popen($this->config['sendmail_path'] . " -oi -f ".$return_path." -t", 'w');
 
 		// No connection?
 		if(! is_resource($handle))

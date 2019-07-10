@@ -6,10 +6,11 @@
 	<style type="text/css">
 		* { margin: 0; padding: 0; }
 		body { background-color: #EEE; font-family: sans-serif; font-size: 16px; line-height: 20px; margin: 40px; }
-		#wrapper { padding: 30px; background: #fff; color: #333; margin: 0 auto; width: 800px; }
+		#wrapper { padding: 30px; background: #fff; color: #333; border: 1px solid #ccc; margin: 0 auto; width: 800px; }
 		a { color: #36428D; }
 		h1 { color: #000; font-size: 55px; padding: 0 0 25px; line-height: 1em; }
 		.intro { font-size: 22px; line-height: 30px; font-family: georgia, serif; color: #555; padding: 29px 0 20px; border-top: 1px solid #CCC; }
+		.nextintro { font-size: 22px; line-height: 30px; font-family: georgia, serif; color: #555; padding: 0px 0 20px; }
 		h2 { margin: 50px 0 15px; padding: 0 0 10px; font-size: 18px; border-bottom: 1px dashed #ccc; }
 		h2.first { margin: 10px 0 15px; }
 		p { margin: 0 0 15px; line-height: 22px;}
@@ -34,7 +35,7 @@
 	<div id="wrapper">
 		<h1><?php echo $severity; ?>!</h1>
 
-		<p class="intro"><?php echo $type; ?> [ <?php echo $severity; ?> ]: <?php echo $message; ?></p>
+		<p class="intro"><?php echo $type; ?> [ <?php echo $severity; ?> ]:<br /><?php echo e($message); ?></p>
 
 		<h2 class="first"><?php echo $filepath; ?> @ line <?php echo $error_line; ?></h2>
 
@@ -54,13 +55,25 @@
 			<li>
 				<a href="#" onclick="javascript:fuel_toggle('backtrace_<?php echo $id; ?>');return false;"><?php echo \Fuel::clean_path($trace['file']).' @ line '.$trace['line']; ?></a>
 				<div id="backtrace_<?php echo $id; ?>" class="backtrace_block">
-<pre class="fuel_debug_source"><?php foreach ($debug_lines as $line_num => $line_content): ?>
+<pre class="fuel_debug_source"><?php foreach ((array) $debug_lines as $line_num => $line_content): ?>
 <span<?php echo ($line_num == $trace['line']) ? ' class="fuel_line fuel_current_line"' : ' class="fuel_line"'; ?>><span class="fuel_line_number"><?php echo str_pad($line_num, (strlen(count($debug_lines))), ' ', STR_PAD_LEFT); ?></span><span class="fuel_line_content"><?php echo $line_content . PHP_EOL; ?>
 </span></span><?php endforeach; ?></pre>
 				</div>
 			</li>
 		<?php endforeach; ?>
 		</ol>
+
+<?php if ( ! empty($soap)): ?>
+		<h2>SOAP Response</h2>
+		<p class="nextintro">Faultcode: <?php echo $soap['faultcode']; ?> [ <?php echo $soap['errortype']; ?> ]:<br />Faultstring: <?php echo e($soap['faultstring']); ?></p>
+		<ol>
+		<?php foreach($soap['backtrace'] as $trace): ?>
+			<li>
+				<?php echo e(str_replace(' ', '&nbsp;', $trace)); ?>
+			</li>
+		<?php endforeach; ?>
+		</ol>
+<?php endif; ?>
 
 <?php if (count($non_fatal) > 0): ?>
 		<h2>Prior Non-Fatal Errors</h2>
@@ -73,7 +86,7 @@
 			$debug_lines = \Debug::file_lines($orig_filepath, $error_line);
 		?>
 			<li>
-				<a href="#" onclick="javascript:fuel_toggle('non_fatal_<?php echo $id; ?>');return false;"><?php echo $severity; ?>: <?php echo $message; ?> in <?php echo $filepath; ?> @ line <?php echo $error_line; ?></a>
+				<a href="#" onclick="javascript:fuel_toggle('non_fatal_<?php echo $id; ?>');return false;"><?php echo $severity; ?>: <?php echo e($message); ?> in <?php echo $filepath; ?> @ line <?php echo $error_line; ?></a>
 				<div id="non_fatal_<?php echo $id; ?>" class="backtrace_block">
 <pre class="fuel_debug_source"><?php foreach ($debug_lines as $line_num => $line_content): ?>
 <span<?php echo ($line_num == $error_line) ? ' class="fuel_line fuel_current_line"' : ' class="fuel_line"'; ?>><span class="fuel_line_number"><?php echo str_pad($line_num, (strlen(count($debug_lines))), ' ', STR_PAD_LEFT); ?></span><span class="fuel_line_content"><?php echo $line_content . PHP_EOL; ?>
@@ -85,12 +98,17 @@
 <?php endif; ?>
 
 <?php if ( ! empty($contents)): ?>
-		<h2>Prior Contents (<a href="#" onclick="javascript:fuel_toggle('prior_contents');return false;">show</a>)</h2>
-		<pre id="prior_contents" class="fuel_debug_source" style="display: none;"><?php echo e($contents); ?></pre>
+	<h2>Prior Contents (<a href="#" onclick="javascript:fuel_toggle('prior_contents');return false;">show</a>)</h2>
+	<?php if (\Config::get('errors.render_prior', false) == true): ?>
+		<div id="prior_contents" class="fuel_debug_source" style="display: none;"><?php echo $contents ?></div>
+	<?php endif; ?>
+	<?php if (\Config::get('errors.render_prior', false) == false): ?>
+		<pre id="prior_contents" class="fuel_debug_source" style="display: none;"><?php echo e($contents) ?></pre>
+	<?php endif; ?>
 <?php endif; ?>
 
 		<p class="footer">
-			<a href="http://fuelphp.com">FuelPHP</a> is released under the MIT license.
+			<a href="https://fuelphp.com">FuelPHP</a> is released under the MIT license.
 		</p>
 	</div>
 </body>

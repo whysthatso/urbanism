@@ -1,13 +1,13 @@
 <?php
 /**
- * Fuel is a fast, lightweight, community driven PHP5 framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
- * @package		Fuel
- * @version		1.0
- * @author		Fuel Development Team
- * @license		MIT License
- * @copyright	2010 - 2012 Fuel Development Team
- * @link		http://fuelphp.com
+ * @package    Fuel
+ * @version    1.8.2
+ * @author     Fuel Development Team
+ * @license    MIT License
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Orm;
@@ -45,21 +45,23 @@ class BelongsTo extends Relation
 		$this->model_to = get_real_class($this->model_to);
 	}
 
-	public function get(Model $from)
+	public function get(Model $from, array $conditions = array())
 	{
-		$query = call_user_func(array($this->model_to, 'find'));
+		$query = call_user_func(array($this->model_to, 'query'));
 		reset($this->key_to);
 		foreach ($this->key_from as $key)
 		{
+			// no point running a query when a key value is null
+			if ($from->{$key} === null)
+			{
+				return null;
+			}
 			$query->where(current($this->key_to), $from->{$key});
 			next($this->key_to);
 		}
 
-		foreach (\Arr::get($this->conditions, 'where', array()) as $key => $condition)
-		{
-			is_array($condition) or $condition = array($key, '=', $condition);
-			$query->where($condition);
-		}
+		$conditions = \Arr::merge($this->conditions, $conditions);
+		$query->_parse_where_array(\Arr::get($conditions, 'where', array()));
 
 		return $query->get_one();
 	}
@@ -68,17 +70,17 @@ class BelongsTo extends Relation
 	{
 		$alias_to = 't'.$alias_to_nr;
 		$model = array(
-			'model'        => $this->model_to,
-			'connection'   => call_user_func(array($this->model_to, 'connection')),
-			'table'        => array(call_user_func(array($this->model_to, 'table')), $alias_to),
-			'primary_key'  => call_user_func(array($this->model_to, 'primary_key')),
-			'join_type'    => \Arr::get($conditions, 'join_type') ?: \Arr::get($this->conditions, 'join_type', 'left'),
-			'join_on'      => array(),
-			'columns'      => $this->select($alias_to),
-			'rel_name'     => strpos($rel_name, '.') ? substr($rel_name, strrpos($rel_name, '.') + 1) : $rel_name,
-			'relation'     => $this,
-			'where'        => \Arr::get($conditions, 'where', array()),
-			'order_by'     => \Arr::get($conditions, 'order_by') ?: \Arr::get($this->conditions, 'order_by', array()),
+			'model'       => $this->model_to,
+			'connection'  => call_user_func(array($this->model_to, 'connection')),
+			'table'       => array(call_user_func(array($this->model_to, 'table')), $alias_to),
+			'primary_key' => call_user_func(array($this->model_to, 'primary_key')),
+			'join_type'   => \Arr::get($conditions, 'join_type') ?: \Arr::get($this->conditions, 'join_type', 'left'),
+			'join_on'     => array(),
+			'columns'     => $this->select($alias_to),
+			'rel_name'    => strpos($rel_name, '.') ? substr($rel_name, strrpos($rel_name, '.') + 1) : $rel_name,
+			'relation'    => $this,
+			'where'       => \Arr::get($conditions, 'where', array()),
+			'order_by'    => \Arr::get($conditions, 'order_by') ?: \Arr::get($this->conditions, 'order_by', array()),
 		);
 
 		reset($this->key_to);
@@ -87,16 +89,23 @@ class BelongsTo extends Relation
 			$model['join_on'][] = array($alias_from.'.'.$key, '=', $alias_to.'.'.current($this->key_to));
 			next($this->key_to);
 		}
-		foreach (\Arr::get($this->conditions, 'where', array()) as $key => $condition)
+		foreach (array(\Arr::get($this->conditions, 'where', array()), \Arr::get($conditions, 'join_on', array())) as $c)
 		{
-			! is_array($condition) and $condition = array($key, '=', $condition);
-			if ( ! $condition[0] instanceof \Fuel\Core\Database_Expression and strpos($condition[0], '.') === false)
+			foreach ($c as $key => $condition)
 			{
-				$condition[0] = $alias_to.'.'.$condition[0];
-			}
-			is_string($condition[2]) and $condition[2] = \Db::quote($condition[2], $model['connection']);
+				! is_array($condition) and $condition = array($key, '=', $condition);
+				if ( ! $condition[0] instanceof \Fuel\Core\Database_Expression and strpos($condition[0], '.') === false)
+				{
+					$condition[0] = $alias_to.'.'.$condition[0];
+				}
+				if (count($condition) == 2) // From Query::_where()
+				{
+					$condition = array($condition[0], '=', $condition[1]);
+				}
+				is_string($condition[2]) and $condition[2] = \Db::quote($condition[2], $model['connection']);
 
-			$model['join_on'][] = $condition;
+				$model['join_on'][] = $condition;
+			}
 		}
 
 		return array($rel_name => $model);
@@ -121,6 +130,7 @@ class BelongsTo extends Relation
 		}
 
 		$current_model_id = $model_to ? $model_to->implode_pk($model_to) : null;
+
 		// Check if there was another model assigned (this supersedes any change to the foreign key(s))
 		if ($current_model_id != $original_model_id)
 		{
@@ -134,26 +144,29 @@ class BelongsTo extends Relation
 			}
 			$model_from->freeze();
 		}
-		// if not check the model_from's foreign_keys
-		else
+
+		// if not check the model_from's foreign_keys against the model_to's primary keys
+		// because that is how the model stores them
+		elseif ($current_model_id != null)
 		{
 			$foreign_keys = count($this->key_to) == 1 ? array($original_model_id) : explode('][', substr($original_model_id, 1, -1));
 			$changed      = false;
 			$new_rel_id   = array();
 			reset($foreign_keys);
-			foreach ($this->key_from as $fk)
+			$m = $this->model_to;
+			foreach ($m::primary_key() as $pk)
 			{
-				if (is_null($model_from->{$fk}))
+				if (is_null($model_to->{$pk}))
 				{
 					$changed = true;
 					$new_rel_id = null;
 					break;
 				}
-				elseif ($model_from->{$fk} != current($foreign_keys))
+				elseif ($model_to->{$pk} != current($foreign_keys))
 				{
 					$changed = true;
 				}
-				$new_rel_id[] = $model_from->{$fk};
+				$new_rel_id[] = $model_to->{$pk};
 				next($foreign_keys);
 			}
 
@@ -192,7 +205,7 @@ class BelongsTo extends Relation
 
 	public function delete($model_from, $model_to, $parent_deleted, $cascade)
 	{
-		if ($parent_deleted)
+		if ( ! $parent_deleted)
 		{
 			return;
 		}
@@ -202,10 +215,6 @@ class BelongsTo extends Relation
 		$rels = $model_from->_relate();
 		$rels[$this->name] = null;
 		$model_from->_relate($rels);
-		foreach ($this->key_from as $fk)
-		{
-			$model_from->{$fk} = null;
-		}
 		$model_from->freeze();
 
 		$cascade = is_null($cascade) ? $this->cascade_delete : (bool) $cascade;

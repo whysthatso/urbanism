@@ -1,17 +1,16 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
-
 
 class FileAccessException extends \FuelException {}
 class OutsideAreaException extends \OutOfBoundsException {}
@@ -28,7 +27,6 @@ class InvalidPathException extends \FileAccessException {}
  */
 class File
 {
-
 	/**
 	 * @var  array  loaded area's
 	 */
@@ -60,7 +58,7 @@ class File
 	/**
 	 * Instance
 	 *
-	 * @param   string|File_Area|null  file area name, object or null for base area
+	 * @param   string|File_Area|null  $area  file area name, object or null for base area
 	 * @return  File_Area
 	 */
 	public static function instance($area = null)
@@ -70,15 +68,22 @@ class File
 			return $area;
 		}
 
-		return array_key_exists($area, static::$areas) ? static::$areas[$area] : false;
+		$instance = array_key_exists($area, static::$areas) ? static::$areas[$area] : false;
+
+		if ($instance === false)
+		{
+			throw new \InvalidArgumentException('There is no file instance named "'.$area.'".');
+		}
+
+		return $instance;
 	}
 
 	/**
 	 * File & directory objects factory
 	 *
-	 * @param   string  path to the file or directory
-	 * @param   array   configuration items
-	 * @param   string|File_Area|null  file area name, object or null for base area
+	 * @param   string                 $path    path to the file or directory
+	 * @param   array                  $config  configuration items
+	 * @param   string|File_Area|null  $area    file area name, object or null for base area
 	 * @return  File_Handler_File
 	 */
 	public static function get($path, array $config = array(), $area = null)
@@ -89,7 +94,10 @@ class File
 	/**
 	 * Get the url.
 	 *
-	 * @return  bool
+	 * @param  string  $path
+	 * @param  array   $config
+	 * @param  null    $area
+	 * @return bool
 	 */
 	public static function get_url($path, array $config = array(), $area = null)
 	{
@@ -97,12 +105,36 @@ class File
 	}
 
 	/**
-	 * Create an empty file
+	 * Check for file existence
 	 *
-	 * @param   string  directory where to create file
-	 * @param   string  filename
-	 * @param   string|File_Area|null  file area name, object or null for base area
+	 * @param   string                 $path  path to file to check
+	 * @param   string|File_Area|null  $area  file area name, object or null for base area
 	 * @return  bool
+	 */
+	public static function exists($path, $area = null)
+	{
+		$path = rtrim(static::instance($area)->get_path($path), '\\/');
+
+		// resolve symlinks
+		while ($path and is_link($path))
+		{
+			$path = readlink($path);
+		}
+
+		return is_file($path);
+	}
+
+	/**
+	 * Create a file
+	 *
+	 * @param  string                 $basepath  directory where to create file
+	 * @param  string                 $name      filename
+	 * @param  null                   $contents  contents of file
+	 * @param  string|File_Area|null  $area      file area name, object or null for base area
+	 * @return bool
+	 * @throws \FileAccessException
+	 * @throws \InvalidPathException
+	 * @throws \OutsideAreaException
 	 */
 	public static function create($basepath, $name, $contents = null, $area = null)
 	{
@@ -113,7 +145,7 @@ class File
 		{
 			throw new \InvalidPathException('Invalid basepath: "'.$basepath.'", cannot create file at this location.');
 		}
-		elseif (file_exists($new_file))
+		elseif (is_file($new_file))
 		{
 			throw new \FileAccessException('File: "'.$new_file.'" already exists, cannot be created.');
 		}
@@ -128,45 +160,84 @@ class File
 	/**
 	 * Create an empty directory
 	 *
-	 * @param   string  directory where to create new dir
-	 * @param   string  dirname
-	 * @param   int     (octal) file permissions
-	 * @param   string|File_Area|null  file area name, object or null for non-specific
-	 * @return  bool
+	 * @param  string                 directory where to create new dir
+	 * @param  string                 dirname
+	 * @param  int                    (octal) file permissions
+	 * @param  string|File_Area|null  file area name, object or null for non-specific
+	 * @return bool
+	 * @throws \FileAccessException
+	 * @throws \InvalidPathException
+	 * @throws \OutsideAreaException
 	 */
 	public static function create_dir($basepath, $name, $chmod = null, $area = null)
 	{
-		$basepath	= rtrim(static::instance($area)->get_path($basepath), '\\/').DS;
-		$new_dir	= static::instance($area)->get_path($basepath.$name);
+		$path	 = rtrim(static::instance($area)->get_path($basepath), '\\/').DS;
+		$new_dir = static::instance($area)->get_path($path.trim($name, '\\/'));
 		is_null($chmod) and $chmod = \Config::get('file.chmod.folders', 0777);
 
-		if ( ! is_dir($basepath) or ! is_writable($basepath))
+		if ( ! is_dir($path) or ! is_writable($path))
 		{
-			throw new \InvalidPathException('Invalid basepath: "'.$basepath.'", cannot create directory at this location.');
+			throw new \InvalidPathException('Invalid basepath: "'.$path.'", cannot create directory at this location.');
 		}
-		elseif (file_exists($new_dir))
+		elseif (is_dir($new_dir))
 		{
 			throw new \FileAccessException('Directory: "'.$new_dir.'" exists already, cannot be created.');
 		}
 
-		$recursive = (strpos($name, '/') !== false or strpos($name, '\\') !== false);
+		// unify the path separators, and get the part we need to add to the basepath
+		$segments = explode(DS, str_replace(array('\\', '/'), DS, substr($new_dir, strlen($path))));
 
-		return mkdir($new_dir, $chmod, $recursive);
+		// recursively create the directory. we can't use mkdir permissions or recursive
+		// due to the fact that mkdir is restricted by the current users umask
+		foreach ($segments as $dir)
+		{
+			// some security checking
+			if ($dir == '.' or $dir == '..')
+			{
+				throw new \FileAccessException('Directory to be created contains illegal segments.');
+			}
+
+			$path .= DS.$dir;
+			if ( ! is_dir($path))
+			{
+				try
+				{
+					if ( ! mkdir($path))
+					{
+						return false;
+					}
+					chmod($path, $chmod);
+				}
+				catch (\PHPErrorException $e)
+				{
+					if ( ! is_dir($path))
+					{
+						return false;
+					}
+					chmod($path, $chmod);
+				}
+			}
+		}
+
+		return true;
 	}
 
 	/**
 	 * Read file
 	 *
-	 * @param   string  file to read
-	 * @param   bool    whether to use readfile() or file_get_contents()
-	 * @param   string|File_Area|null  file area name, object or null for base area
-	 * @return  IO|string  file contents
+	 * @param  string                 $path       file to read
+	 * @param  bool                   $as_string  whether to use readfile() or file_get_contents()
+	 * @param  string|File_Area|null  $area       file area name, object or null for base area
+	 * @return IO|string  file contents
+	 * @throws \FileAccessException
+	 * @throws \InvalidPathException
+	 * @throws \OutsideAreaException
 	 */
 	public static function read($path, $as_string = false, $area = null)
 	{
 		$path = static::instance($area)->get_path($path);
 
-		if( ! file_exists($path) or ! is_file($path))
+		if ( ! is_file($path))
 		{
 			throw new \InvalidPathException('Cannot read file: "'.$path.'", file does not exists.');
 		}
@@ -181,11 +252,14 @@ class File
 	/**
 	 * Read directory
 	 *
-	 * @param   string      directory to read
-	 * @param   int         depth to recurse directory, 1 is only current and 0 or smaller is unlimited
-	 * @param   Array|null  array of partial regexes or non-array for default
-	 * @param   string|File_Area|null  file area name, object or null for base area
-	 * @return  array  directory contents in an array
+	 * @param  string                 $path    directory to read
+	 * @param  int                    $depth   depth to recurse directory, 1 is only current and 0 or smaller is unlimited
+	 * @param  Array|null             $filter  array of partial regexps or non-array for default
+	 * @param  string|File_Area|null  $area    file area name, object or null for base area
+	 * @return array
+	 * @throws \FileAccessException
+	 * @throws \InvalidPathException
+	 * @throws \OutsideAreaException
 	 */
 	public static function read_dir($path, $depth = 0, $filter = null, $area = null)
 	{
@@ -248,7 +322,7 @@ class File
 						}
 					}
 
-					$not = substr($f, 0, 1) == '!';  // whether it's a negative condition
+					$not = substr($f, 0, 1) === '!';  // whether it's a negative condition
 					$f = $not ? substr($f, 1) : $f;
 					// on negative condition a match leads to a continue
 					if (($match = preg_match('/'.$f.'/uiD', $file) > 0) and $not)
@@ -297,17 +371,21 @@ class File
 	/**
 	 * Update a file
 	 *
-	 * @param   string  directory where to write the file
-	 * @param   string  filename
-	 * @param   string|File_Area|null  file area name, object or null for base area
+	 * @param   string                 $basepath  directory where to write the file
+	 * @param   string                 $name      filename
+	 * @param   string                 $contents  contents of file
+	 * @param   string|File_Area|null  $area      file area name, object or null for base area
 	 * @return  bool
+	 * @throws  \InvalidPathException
+	 * @throws  \FileAccessException
+	 * @throws  \OutsideAreaException
 	 */
 	public static function update($basepath, $name, $contents = null, $area = null)
 	{
 		$basepath  = rtrim(static::instance($area)->get_path($basepath), '\\/').DS;
 		$new_file  = static::instance($area)->get_path($basepath.$name);
 
-		if ( ! $file = static::open_file(@fopen($new_file, 'w'), true, $area) )
+		if ( ! $file = static::open_file(@fopen($new_file, 'w'), true, $area))
 		{
 			if ( ! is_dir($basepath) or ! is_writable($basepath))
 			{
@@ -326,17 +404,21 @@ class File
 	/**
 	 * Append to a file
 	 *
-	 * @param   string  directory where to write the file
-	 * @param   string  filename
-	 * @param   string|File_Area|null  file area name, object or null for base area
+	 * @param   string                 $basepath  directory where to write the file
+	 * @param   string                 $name      filename
+	 * @param   string                 $contents  contents of file
+	 * @param   string|File_Area|null  $area      file area name, object or null for base area
 	 * @return  bool
+	 * @throws  \InvalidPathException
+	 * @throws  \FileAccessException
+	 * @throws  \OutsideAreaException
 	 */
 	public static function append($basepath, $name, $contents = null, $area = null)
 	{
 		$basepath  = rtrim(static::instance($area)->get_path($basepath), '\\/').DS;
 		$new_file  = static::instance($area)->get_path($basepath.$name);
 
-		if ( ! file_exists($new_file))
+		if ( ! is_file($new_file))
 		{
 			throw new \FileAccessException('File: "'.$new_file.'" does not exist, cannot be appended.');
 		}
@@ -360,9 +442,12 @@ class File
 	/**
 	 * Get the octal permissions for a file or directory
 	 *
-	 * @param   string  path to the file or directory
-	 * @param   mixed   file area name, object or null for base area
-	 * $return  string  octal file permissions
+	 * @param   string                 $path  path to the file or directory
+	 * @param   string|File_Area|null  $area  file area name, object or null for base area
+	 * @return  string  octal file permissions
+	 * @throws  \FileAccessException
+	 * @throws  \InvalidPathException
+	 * @throws  \OutsideAreaException
 	 */
 	public static function get_permissions($path, $area = null)
 	{
@@ -380,10 +465,13 @@ class File
 	/**
 	 * Get a file's or directory's created or modified timestamp.
 	 *
-	 * @param   string  path to the file or directory
-	 * @param   string  modified or created
-	 * @param   mixed   file area name, object or null for base area
-	 * @return  int     Unix Timestamp
+	 * @param   string                 $path  path to the file or directory
+	 * @param   string                 $type  modified or created
+	 * @param   string|File_Area|null  $area  file area name, object or null for base area
+	 * @return  int  Unix Timestamp
+	 * @throws  \FileAccessException
+	 * @throws  \InvalidPathException
+	 * @throws  \OutsideAreaException
 	 */
 	public static function get_time($path, $type = 'modified', $area = null)
 	{
@@ -411,9 +499,12 @@ class File
 	/**
 	 * Get a file's size.
 	 *
-	 * @param   string  path to the file or directory
-	 * @param   mixed   file area name, object or null for base area
+	 * @param   string  $path  path to the file or directory
+	 * @param   mixed   $area  file area name, object or null for base area
 	 * @return  int     the file's size in bytes
+	 * @throws  \FileAccessException
+	 * @throws  \InvalidPathException
+	 * @throws  \OutsideAreaException
 	 */
 	public static function get_size($path, $area = null)
 	{
@@ -430,39 +521,54 @@ class File
 	/**
 	 * Rename directory or file
 	 *
-	 * @param   string  path to file or directory to rename
-	 * @param   string  new path (full path, can also cause move)
-	 * @param   string|File_Area|null  file area name, object or null for non-specific
+	 * @param   string                 $path         path to file or directory to rename
+	 * @param   string                 $new_path     new path (full path, can also cause move)
+	 * @param   string|File_Area|null  $source_area  source path file area name, object or null for non-specific
+	 * @param   string|File_Area|null  $target_area  target path file area name, object or null for non-specific. Defaults to source_area if not set.
 	 * @return  bool
+	 * @throws  \FileAccessException
+	 * @throws  \OutsideAreaException
 	 */
-	public static function rename($path, $new_path, $area = null)
+	public static function rename($path, $new_path, $source_area = null, $target_area = null)
 	{
-		$path = static::instance($area)->get_path($path);
-		$new_path = static::instance($area)->get_path($new_path);
+		$path = static::instance($source_area)->get_path($path);
+		$new_path = static::instance($target_area ?: $source_area)->get_path($new_path);
 
 		return rename($path, $new_path);
 	}
 
 	/**
 	 * Alias for rename(), not needed but consistent with other methods
+	 *
+	 * @param string                $path         path to directory to rename
+	 * @param string                $new_path     new path (full path, can also cause move)
+	 * @param string|File_Area|null $source_area  source path file area name, object or null for non-specific
+	 * @param string|File_Area|null $target_area  target path file area name, object or null for non-specific. Defaults to source_area if not set.
+	 * @return bool
+	 * @throws  \FileAccessException
+	 * @throws  \OutsideAreaException
 	 */
-	public static function rename_dir($path, $new_path, $area = null)
+	public static function rename_dir($path, $new_path, $source_area = null, $target_area = null)
 	{
-		return static::rename($path, $new_path, $area);
+		return static::rename($path, $new_path, $source_area, $target_area);
 	}
 
 	/**
 	 * Copy file
 	 *
-	 * @param   string  path to file to copy
-	 * @param   string  new base directory (full path)
-	 * @param   string|File_Area|null  file area name, object or null for non-specific
+	 * @param   string                 path         path to file to copy
+	 * @param   string                 new_path     new base directory (full path)
+	 * @param   string|File_Area|null  source_area  source path file area name, object or null for non-specific
+	 * @param   string|File_Area|null  target_area  target path file area name, object or null for non-specific. Defaults to source_area if not set.
+	 * @throws \FileAccessException
+	 * @throws \InvalidPathException
+	 * @throws \OutsideAreaException
 	 * @return  bool
 	 */
-	public static function copy($path, $new_path, $area = null)
+	public static function copy($path, $new_path, $source_area = null, $target_area = null)
 	{
-		$path      = static::instance($area)->get_path($path);
-		$new_path  = static::instance($area)->get_path($new_path);
+		$path      = static::instance($source_area)->get_path($path);
+		$new_path  = static::instance($target_area ?: $source_area)->get_path($new_path);
 
 		if ( ! is_file($path))
 		{
@@ -472,22 +578,32 @@ class File
 		{
 			throw new \FileAccessException('Cannot copy file: new path: "'.$new_path.'" already exists.');
 		}
-		return copy($path, $new_path);
+
+		if (copy($path, $new_path))
+		{
+			return chmod($new_path, fileperms($path));
+		}
+
+		return false;
 	}
 
 	/**
 	 * Copy directory
 	 *
-	 * @param   string  path to directory which contents will be copied
-	 * @param   string  new base directory (full path)
-	 * @param   string|File_Area|null  file area name, object or null for non-specific
-	 * @return  bool
-	 * @throws  FileAccessException  when something went wrong
+	 * @param  string                 $path         path to directory which contents will be copied
+	 * @param  string                 $new_path     new base directory (full path)
+	 * @param  string|File_Area|null  $source_area  source path file area name, object or null for non-specific
+	 * @param  string|File_Area|null  $target_area  target path file area name, object or null for non-specific. Defaults to source_area if not set.
+	 * @throws \FileAccessException   when something went wrong
+	 * @throws \InvalidPathException
+	 * @throws \OutsideAreaException
 	 */
-	public static function copy_dir($path, $new_path, $area = null)
+	public static function copy_dir($path, $new_path, $source_area = null, $target_area = null)
 	{
-		$path      = rtrim(static::instance($area)->get_path($path), '\\/').DS;
-		$new_path  = rtrim(static::instance($area)->get_path($new_path), '\\/').DS;
+		$target_area = $target_area ?: $source_area;
+
+		$path      = rtrim(static::instance($source_area)->get_path($path), '\\/').DS;
+		$new_path  = rtrim(static::instance($target_area)->get_path($new_path), '\\/').DS;
 
 		if ( ! is_dir($path))
 		{
@@ -496,20 +612,20 @@ class File
 		elseif ( ! file_exists($new_path))
 		{
 			$newpath_dirname = pathinfo($new_path, PATHINFO_DIRNAME);
-			static::create_dir($newpath_dirname, pathinfo($new_path, PATHINFO_BASENAME), fileperms($newpath_dirname) ?: 0777, $area);
+			static::create_dir($newpath_dirname, pathinfo($new_path, PATHINFO_BASENAME), fileperms($newpath_dirname) ?: 0777, $target_area);
 		}
 
-		$files = static::read_dir($path, -1, array(), $area);
+		$files = static::read_dir($path, -1, array(), $source_area);
 		foreach ($files as $dir => $file)
 		{
 			if (is_array($file))
 			{
-				$check = static::create_dir($new_path.DS, substr($dir, 0, -1), fileperms($path.$dir) ?: 0777, $area);
-				$check and static::copy_dir($path.$dir.DS, $new_path.$dir, $area);
+				$check = static::create_dir($new_path.DS, substr($dir, 0, -1), fileperms($path.$dir) ?: 0777, $target_area);
+				$check and static::copy_dir($path.$dir.DS, $new_path.$dir, $source_area, $target_area);
 			}
 			else
 			{
-				$check = static::copy($path.$file, $new_path.$file, $area);
+				$check = static::copy($path.$file, $new_path.$file, $source_area, $target_area);
 			}
 
 			// abort if something went wrong
@@ -523,11 +639,14 @@ class File
 	/**
 	 * Create a new symlink
 	 *
-	 * @param   string  target of symlink
-	 * @param   string  destination of symlink
-	 * @param   bool    true for file, false for directory
-	 * @param   string|File_Area|null  file area name, object or null for base area
+	 * @param   string                 $path       target of symlink
+	 * @param   string                 $link_path  destination of symlink
+	 * @param   bool                   $is_file    true for file, false for directory
+	 * @param   string|File_Area|null  $area       file area name, object or null for base area
 	 * @return  bool
+	 * @throws \FileAccessException
+	 * @throws \InvalidPathException
+	 * @throws \OutsideAreaException
 	 */
 	public static function symlink($path, $link_path, $is_file = true, $area = null)
 	{
@@ -553,9 +672,12 @@ class File
 	/**
 	 * Delete file
 	 *
-	 * @param   string  path to file to delete
-	 * @param   string|File_Area|null  file area name, object or null for base area
-	 * @return  bool
+	 * @param string                $path  path to file to delete
+	 * @param string|File_Area|null $area  file area name, object or null for base area
+	 * @return bool
+	 * @throws \FileAccessException
+	 * @throws \InvalidPathException
+	 * @throws \OutsideAreaException
 	 */
 	public static function delete($path, $area = null)
 	{
@@ -572,11 +694,14 @@ class File
 	/**
 	 * Delete directory
 	 *
-	 * @param   string  path to directory to delete
-	 * @param   bool    whether to also delete contents of subdirectories
-	 * @param   bool    whether to delete the parent dir itself when empty
-	 * @param   string|File_Area|null  file area name, object or null for base area
+	 * @param   string                 $path        path to directory to delete
+	 * @param   bool                   $recursive   whether to also delete contents of subdirectories
+	 * @param   bool                   $delete_top  whether to delete the parent dir itself when empty
+	 * @param   string|File_Area|null  $area        file area name, object or null for base area
 	 * @return  bool
+	 * @throws \FileAccessException
+	 * @throws \InvalidPathException
+	 * @throws \OutsideAreaException
 	 */
 	public static function delete_dir($path, $recursive = true, $delete_top = true, $area = null)
 	{
@@ -625,9 +750,12 @@ class File
 	/**
 	 * Open and lock file
 	 *
-	 * @param  resource|string  file resource or path
-	 * @param  constant  either valid lock constant or true=LOCK_EX / false=LOCK_UN
-	 * @param  string|File_Area|null  file area name, object or null for base area
+	 * @param  resource|string        $path  file resource or path
+	 * @param  constant|bool          $lock  either valid lock constant or true=LOCK_EX / false=LOCK_UN
+	 * @param  string|File_Area|null  $area  file area name, object or null for base area
+	 * @return bool|resource
+	 * @throws \FileAccessException
+	 * @throws \OutsideAreaException
 	 */
 	public static function open_file($path, $lock = true, $area = null)
 	{
@@ -654,7 +782,18 @@ class File
 		}
 
 		// Accept valid lock constant or set to LOCK_EX
-		$lock = in_array($lock, array(LOCK_SH, LOCK_EX, LOCK_NB)) ? $lock : LOCK_EX;
+		if ($lock === true)
+		{
+			$lock = LOCK_EX;
+		}
+		elseif ($lock === false)
+		{
+			$lock = LOCK_UN;
+		}
+		elseif ( ! in_array($lock, array(LOCK_SH, LOCK_UN, LOCK_EX, LOCK_SH | LOCK_NB, LOCK_EX | LOCK_NB)))
+		{
+			throw new \FileAccessException('Incorrect lock value passed.');
+		}
 
 		// Try to get a lock, timeout after 5 seconds
 		$lock_mtime = microtime(true);
@@ -672,27 +811,29 @@ class File
 	/**
 	 * Close file resource & unlock
 	 *
-	 * @param  resource  open file resource
-	 * @param  string|File_Area|null  file area name, object or null for base area
+	 * @param resource               $resource  open file resource
+	 * @param string|File_Area|null  $area      file area name, object or null for base area
 	 */
 	public static function close_file($resource, $area = null)
 	{
-		fclose($resource);
-
 		// If locks aren't used, don't unlock
-		if ( ! static::instance($area)->use_locks())
+		if ( static::instance($area)->use_locks())
 		{
-			return;
+			flock($resource, LOCK_UN);
 		}
 
-		flock($resource, LOCK_UN);
+		fclose($resource);
 	}
 
 	/**
 	 * Get detailed information about a file
 	 *
-	 * @param  string  file path
-	 * @param  string|File_Area|null  file area name, object or null for base area
+	 * @param  string                 $path  file path
+	 * @param  string|File_Area|null  $area  file area name, object or null for base area
+	 * @return array
+	 * @throws \FileAccessException
+	 * @throws \InvalidPathException
+	 * @throws \OutsideAreaException
 	 */
 	public static function file_info($path, $area = null)
 	{
@@ -711,7 +852,7 @@ class File
 			'time_modified' => '',
 		);
 
-		if ( ! $info['realpath'] = static::instance($area)->get_path($path) or ! file_exists($info['realpath']))
+		if ( ! $info['realpath'] = static::instance($area)->get_path($path) or ! is_file($info['realpath']))
 		{
 			throw new \InvalidPathException('Filename given is not a valid file.');
 		}
@@ -735,8 +876,8 @@ class File
 
 		$info['size'] = static::get_size($info['realpath'], $area);
 		$info['permissions'] = static::get_permissions($info['realpath'], $area);
-		$info['time_created'] = static::get_time($info['realpath'], $type = 'created', $area);
-		$info['time_modified'] = static::get_time($info['realpath'], $type = 'modified', $area);
+		$info['time_created'] = static::get_time($info['realpath'], 'created', $area);
+		$info['time_modified'] = static::get_time($info['realpath'], 'modified', $area);
 
 		return $info;
 	}
@@ -744,19 +885,22 @@ class File
 	/**
 	 * Download a file
 	 *
-	 * @param  string       file path
-	 * @param  string|null  custom name for the file to be downloaded
-	 * @param  string|null  custom mime type or null for file mime type
-	 * @param  string|File_Area|null  file area name, object or null for base area
+	 * @param  string                 $path         file path
+	 * @param  string|null            $name         custom name for the file to be downloaded
+	 * @param  string|null            $mime         custom mime type or null for file mime type
+	 * @param  string|File_Area|null  $area         file area name, object or null for base area
+	 * @param  bool                   $delete       delete the file after download when true
+	 * @param  string                 $disposition  disposition, must be 'attachment' or 'inline'
 	 */
-	public static function download($path, $name = null, $mime = null, $area = null)
+	public static function download($path, $name = null, $mime = null, $area = null, $delete = false, $disposition = 'attachment')
 	{
 		$info = static::file_info($path, $area);
 		$class = get_called_class();
 		empty($mime) or $info['mimetype'] = $mime;
 		empty($name) or $info['basename'] = $name;
+		in_array($disposition, array('inline', 'attachment')) or $disposition = 'attachment';
 
-		\Event::register('shutdown', function () use($info, $area, $class) {
+		\Event::register('fuel-shutdown', function () use($info, $area, $class, $delete, $disposition) {
 
 			if ( ! $file = call_user_func(array($class, 'open_file'), @fopen($info['realpath'], 'rb'), LOCK_SH, $area))
 			{
@@ -772,12 +916,12 @@ class File
 			! ini_get('safe_mode') and set_time_limit(0);
 
 			header('Content-Type: '.$info['mimetype']);
-			header('Content-Disposition: attachment; filename="'.$info['basename'].'"');
-			header('Content-Description: File Transfer');
+			header('Content-Disposition: '.$disposition.'; filename="'.$info['basename'].'"');
+			$disposition === 'attachment' and header('Content-Description: File Transfer');
 			header('Content-Length: '.$info['size']);
 			header('Content-Transfer-Encoding: binary');
-			header('Expires: 0');
-			header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+			$disposition === 'attachment' and header('Expires: 0');
+			$disposition === 'attachment' and header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
 
 			while( ! feof($file))
 			{
@@ -785,6 +929,11 @@ class File
 			}
 
 			call_user_func(array($class, 'close_file'), $file, $area);
+
+			if ($delete)
+			{
+				call_user_func(array($class, 'delete'), $info['realpath'], $area);
+			}
 		});
 
 		exit;

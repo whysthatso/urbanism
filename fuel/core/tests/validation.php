@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -40,8 +40,9 @@ class Test_Validation extends TestCase
 					'dns' => '127.0.0.1',
 					'snd' => '127.0.0',
 					'url' => 'http://www.google.com',
-				)
-			)
+					'gender' => 'M',
+				),
+			),
 		);
 	}
 
@@ -149,6 +150,76 @@ class Test_Validation extends TestCase
 
 		$this->assertEquals($expected, $output);
 	}
+
+    /**
+     * Validation:  match_collection
+     * Expecting:   success
+     *
+     * @dataProvider    form_provider
+     */
+    public function test_validation_match_collection_success($input)
+    {
+        $val = Validation::forge(__FUNCTION__);
+        $val->add_field('gender', 'Gender', 'match_collection[M,F]');
+
+        $output = $val->run($input);
+        $expected = true;
+
+        $this->assertEquals($expected, $output);
+    }
+
+    /**
+     * Validation:  match_collection
+     * Expecting:   failure
+     *
+     * @dataProvider    form_provider
+     */
+    public function test_validation_match_collection_failure($input)
+    {
+        $val = Validation::forge(__FUNCTION__);
+        $val->add_field('gender', 'Gender', 'match_collection["M,F"]');
+        $val->run($input);
+
+        $output = $val->error('gender', false) ? true : false;
+        $expected = true;
+
+        $this->assertEquals($expected, $output);
+    }
+
+    /**
+     * Validation:  match_collection (strict)
+     * Expecting:   success
+     *
+     * @dataProvider    form_provider
+     */
+    public function test_validation_match_collection_strict_success($input)
+    {
+        $val = Validation::forge(__FUNCTION__);
+        $val->add_field('gender', 'Gender', '')->add_rule('match_collection', array('M', 'F'), true);
+
+        $output = $val->run($input);
+        $expected = true;
+
+        $this->assertEquals($expected, $output);
+    }
+
+    /**
+     * Validation:  match_collection (strict)
+     * Expecting:   failure
+     *
+     * @dataProvider    form_provider
+     */
+    public function test_validation_match_collection_strict_failure($input)
+    {
+        $val = Validation::forge(__FUNCTION__);
+        $val->add_field('gender', 'Gender', '')->add_rule('match_collection', array('m', 'f'), true);
+        $val->run($input);
+
+        $output = $val->error('gender', false) ? true : false;
+        $expected = true;
+
+        $this->assertEquals($expected, $output);
+    }
 
 	/**
 	 * Validation:  match_pattern
@@ -382,7 +453,7 @@ class Test_Validation extends TestCase
 	/**
 	 * Validation:  valid_emails (different separator)
 	 * Expecting:   success
-	 * 
+	 *
 	 * @dataProvider    form_provider
 	 */
 	public function test_validation_valid_emails_separator_success($input)
@@ -485,6 +556,48 @@ class Test_Validation extends TestCase
 	}
 
 	/**
+	 * Validation:  valid_ip
+	 * Expecting:   success
+	 */
+	public function test_validation_valid_ip_v6_only_success()
+	{
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('ipv6', 'IPv6 address', 'valid_ip[ipv6]');
+
+		$output = $val->run(array('ipv6' => '2001:0db8:85a3:08d3:1319:8a2e:0370:7334'));
+
+		$this->assertTrue($output);
+	}
+
+	/**
+	 * Validation:  valid_ip
+	 * Expecting:   failure
+	 */
+	public function test_validation_valid_ip_v6_only_failure()
+	{
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('ipv6', 'IPv6 address', 'valid_ip[ipv6]');
+
+		$output = $val->run(array('ipv6' => '192.168.0.1'));
+
+		$this->assertFalse($output);
+	}
+
+	/**
+	 * Validation:  valid_ip
+	 * Expecting:   failure
+	 */
+	public function test_validation_valid_ip_v4_only_failure()
+	{
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('ipv4', 'IPv4 address', 'valid_ip[ipv4]');
+
+		$output = $val->run(array('ipv4' => '2001:0db8:85a3:08d3:1319:8a2e:0370:7334'));
+
+		$this->assertFalse($output);
+	}
+
+	/**
 	 * Validation:  numeric_min
 	 * Expecting:   success
 	 *
@@ -546,6 +659,41 @@ class Test_Validation extends TestCase
 	{
 		$val = Validation::forge(__FUNCTION__);
 		$val->add_field('ten', 'Number', 'numeric_max[8]');
+		$val->run($input);
+
+		$output = $val->error('ten', false) ? true : false;
+		$expected = true;
+
+		$this->assertEquals($expected, $output);
+	}
+
+	/**
+	 * Validation:  numeric_between
+	 * Expecting:   success
+	 *
+	 * @dataProvider    form_provider
+	 */
+	public function test_validation_numeric_between_success($input)
+	{
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('ten', 'Number', 'numeric_between[9,11]');
+
+		$output = $val->run($input);
+		$expected = true;
+
+		$this->assertEquals($expected, $output);
+	}
+
+	/**
+	 * Validation:  numeric_between
+	 * Expecting:   failure
+	 *
+	 * @dataProvider    form_provider
+	 */
+	public function test_validation_numeric_between_failure($input)
+	{
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('ten', 'Number', 'numeric_between[7,8]');
 		$val->run($input);
 
 		$output = $val->error('ten', false) ? true : false;
@@ -619,6 +767,7 @@ class Test_Validation extends TestCase
 
 		$val = Validation::forge(__FUNCTION__);
 		$val->add('f1', 'F1')->add_rule('valid_string', array('alpha', 'numeric'));
+		$val->set_message('valid_string', 'The valid string rule :rule(:param:1) failed for field :label');
 		$val->run($post);
 
 		$test = $val->error('f1')->get_message();
@@ -638,11 +787,167 @@ class Test_Validation extends TestCase
 
 		$val = Validation::forge(__FUNCTION__);
 		$val->add_field('f1', 'F1', 'valid_string[alpha,numeric]');
+		$val->set_message('valid_string', 'The valid string rule :rule(:param:1) failed for field :label');
 		$val->run($post);
 
 		$test = $val->error('f1')->get_message();
 		$expected = 'The valid string rule valid_string(alpha, numeric) failed for field F1';
 
 		$this->assertEquals($expected, $test);
+	}
+
+	/**
+	 * Validation:  valid_date
+	 * Expecting:   success
+	 */
+	public function test_validation_valid_date_none_arguments() {
+		$post = array(
+			'f1' => '2013/02/26',
+			'f2' => '2013-02-26',
+			'f3' => '2013/2/26 12:0:33',
+			'f4' => '19 Jan 2038 03:14:07',
+			'f5' => 'Sat Mar 10 17:16:18 MST 2001',
+			'f6' => '',
+		);
+
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('f1', 'F1', 'valid_date');
+		$val->add_field('f2', 'F2', 'valid_date');
+		$val->add_field('f3', 'F3', 'valid_date');
+		$val->add_field('f4', 'F4', 'valid_date');
+		$val->add_field('f5', 'F5', 'valid_date');
+		$val->add_field('f6', 'F6', 'valid_date');
+		$test = $val->run($post);
+		$expected = true;
+
+		$this->assertEquals($expected, $test);
+	}
+
+	/**
+	 * Validation:  valid_date
+	 * Expecting:   failure
+	 */
+	public function test_validation_valid_date_none_arguments_error() {
+		$post = array(
+			'f1' => 'test',
+		);
+
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('f1', 'F1', 'valid_date');
+		$test = $val->run($post);
+		$expected = false;
+
+		$this->assertEquals($expected, $test);
+	}
+
+	/**
+	 * Validation:  valid_date
+	 * Expecting:   failure
+	 */
+	public function test_validation_valid_date_none_arguments_strict_error() {
+		$post = array(
+			'f1' => '2013/02/29',
+		);
+
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('f1', 'F1', 'valid_date');
+		$test = $val->run($post);
+		$expected = false;
+
+		$this->assertEquals($expected, $test);
+	}
+
+	/**
+	 * Validation:  valid_date
+	 * Expecting:   success
+	 */
+	public function test_validation_valid_date_format() {
+		$post = array(
+			'f1' => '2013/02/26',
+			'f2' => '2013-02-26',
+			'f3' => '2013/2/26 12:00:33',
+			'f4' => '19 Jan 2038 03:14:07',
+			'f5' => 'Sat Mar 10 17:16:18 MST 2001',
+			'f6' => '',
+		);
+
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('f1', 'F1', 'valid_date[Y/m/d]');
+		$val->add_field('f2', 'F2', 'valid_date[Y-m-d]');
+		$val->add_field('f3', 'F3', 'valid_date[Y/m/d H:i:s]');
+		$val->add_field('f4', 'F4', 'valid_date[d M Y H:i:s]');
+		$val->add_field('f5', 'F5', 'valid_date[D M d H:i:s T Y]');
+		$val->add_field('f6', 'F6', 'valid_date[Y/m/d]');
+
+		$test = $val->run($post);
+		$expected = true;
+
+		$this->assertEquals($expected, $test);
+	}
+
+	/**
+	 * Validation:  valid_date
+	 * Expecting:   failure
+	 */
+	public function test_validation_valid_date_format_error() {
+		$post = array(
+			'f1' => '2013/02/26',
+		);
+
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('f1', 'F1', 'valid_date[Y/m/d H:i:s]');
+
+		$test = $val->run($post);
+		$expected = false;
+
+		$this->assertEquals($expected, $test);
+	}
+
+	/**
+	 * Validation:  valid_date
+	 * Expecting:   success
+	 */
+	public function test_validation_valid_date_not_strict() {
+		$post = array(
+			'f1' => '2013/02/29',
+		);
+
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('f1', 'F1', 'valid_date[Y/m/d,0]');
+
+		$test = $val->run($post);
+		$expected = true;
+
+		$this->assertEquals($expected, $test);
+	}
+
+	/**
+	 * Test for $validation->error_message()
+	 *
+	 * @test
+	 */
+	public function test_error_message() {
+		$post = array(
+			'title' => '',
+			'number' => 'ABC',
+		);
+
+		$val = Validation::forge(__FUNCTION__);
+		$val->add_field('title', 'Title', 'required');
+		$val->add_field('number', 'Number', 'required|valid_string[numeric]');
+
+		$val->run($post);
+
+		$expected = 'The field Title is required and must contain a value.';
+		$this->assertEquals($expected, $val->error_message('title'));
+
+		$expected = 'The valid string rule valid_string(numeric) failed for field Number';
+		$this->assertEquals($expected, $val->error_message('number'));
+
+		$expected = 'The field Title is required and must contain a value.';
+		$this->assertEquals($expected, current($val->error_message()));
+
+		$expected = 'No error';
+		$this->assertEquals($expected, $val->error_message('content', 'No error'));
 	}
 }

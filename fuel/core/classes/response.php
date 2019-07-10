@@ -1,27 +1,29 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
 
-
 class Response
 {
-
 	/**
 	 * @var  array  An array of status codes and messages
+	 *
+	 * See http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
+	 * for the complete and approved list, and links to the RFC's that define them
 	 */
 	public static $statuses = array(
 		100 => 'Continue',
 		101 => 'Switching Protocols',
+		102 => 'Processing',
 		200 => 'OK',
 		201 => 'Created',
 		202 => 'Accepted',
@@ -30,6 +32,8 @@ class Response
 		205 => 'Reset Content',
 		206 => 'Partial Content',
 		207 => 'Multi-Status',
+		208 => 'Already Reported',
+		226 => 'IM Used',
 		300 => 'Multiple Choices',
 		301 => 'Moved Permanently',
 		302 => 'Found',
@@ -37,6 +41,7 @@ class Response
 		304 => 'Not Modified',
 		305 => 'Use Proxy',
 		307 => 'Temporary Redirect',
+		308 => 'Permanent Redirect',
 		400 => 'Bad Request',
 		401 => 'Unauthorized',
 		402 => 'Payment Required',
@@ -55,19 +60,37 @@ class Response
 		415 => 'Unsupported Media Type',
 		416 => 'Requested Range Not Satisfiable',
 		417 => 'Expectation Failed',
+		418 => 'I\'m a Teapot',
 		422 => 'Unprocessable Entity',
 		423 => 'Locked',
 		424 => 'Failed Dependency',
+		426 => 'Upgrade Required',
+		428 => 'Precondition Required',
+		429 => 'Too Many Requests',
+		431 => 'Request Header Fields Too Large',
 		500 => 'Internal Server Error',
 		501 => 'Not Implemented',
 		502 => 'Bad Gateway',
 		503 => 'Service Unavailable',
 		504 => 'Gateway Timeout',
 		505 => 'HTTP Version Not Supported',
+		506 => 'Variant Also Negotiates',
 		507 => 'Insufficient Storage',
-		509 => 'Bandwidth Limit Exceeded'
+		508 => 'Loop Detected',
+		509 => 'Bandwidth Limit Exceeded',
+		510 => 'Not Extended',
+		511 => 'Network Authentication Required',
 	);
 
+	/**
+	 * Creates an instance of the Response class
+	 *
+	 * @param   string  $body    The response body
+	 * @param   int     $status  The HTTP response status for this response
+	 * @param   array   $headers Array of HTTP headers for this response
+	 *
+	 * @return  Response
+	 */
 	public static function forge($body = null, $status = 200, array $headers = array())
 	{
 		$response = new static($body, $status, $headers);
@@ -88,6 +111,7 @@ class Response
 	 * @param   string  $url     The url
 	 * @param   string  $method  The redirect method
 	 * @param   int     $code    The redirect status code
+	 *
 	 * @return  void
 	 */
 	public static function redirect($url = '', $method = 'location', $code = 302)
@@ -99,6 +123,11 @@ class Response
 		if (strpos($url, '://') === false)
 		{
 			$url = $url !== '' ? \Uri::create($url) : \Uri::base();
+		}
+
+		if (\Config::get('response.redirect_with_wildcards', true))
+		{
+			strpos($url, '*') !== false and $url = \Uri::segment_replace($url);
 		}
 
 		if ($method == 'location')
@@ -119,12 +148,49 @@ class Response
 	}
 
 	/**
+	 * Redirects back to the previous page, if that page is within the current
+	 * application. If not, it will redirect to the given url, and if none is
+	 * given, back to the application root. If the current page is the application
+	 * root, an exception is thrown
+	 *
+	 * @param   string  $url     The url
+	 * @param   string  $method  The redirect method
+	 * @param   int     $code    The redirect status code
+	 *
+	 * @return  void
+	 *
+	 * @throws  \RuntimeException  If it would redirect back to itself
+	 */
+	public static function redirect_back($url = '', $method = 'location', $code = 302)
+	{
+		// do we have a referrer?
+		if ($referrer = \Input::referrer())
+		{
+			// is it within our website? And not equal to the current url?
+			if (strpos($referrer, \Uri::base()) === 0 and $referrer != \Uri::current())
+			{
+				// redirect back to where we came from
+				static::redirect($referrer, $method, $code);
+			}
+		}
+
+		// make sure we're not redirecting back to ourself
+		if (\Uri::create($url) == \Uri::current())
+		{
+			throw new \RuntimeException('You can not redirect back here, it would result in a redirect loop!');
+		}
+
+		// no referrer or an external link, do a normal redirect
+		static::redirect($url, $method, $code);
+	}
+
+	/**
 	 * @var  int  The HTTP status code
 	 */
 	public $status = 200;
 
 	/**
-	 * @var  array  An array of headers
+	 * @var  array  An array of HTTP headers
 	 */
 	public $headers = array();
 
@@ -136,8 +202,9 @@ class Response
 	/**
 	 * Sets up the response with a body and a status code.
 	 *
-	 * @param  string  $body    The response body
-	 * @param  string  $status  The response status
+	 * @param  string  $body     The response body
+	 * @param  int     $status   The response status
+	 * @param  array   $headers
 	 */
 	public function __construct($body = null, $status = 200, array $headers = array())
 	{
@@ -152,8 +219,9 @@ class Response
 	/**
 	 * Sets the response status code
 	 *
-	 * @param   string  $status  The status code
-	 * @return  $this
+	 * @param   int  $status  The status code
+	 *
+	 * @return  Response
 	 */
 	public function set_status($status = 200)
 	{
@@ -164,10 +232,11 @@ class Response
 	/**
 	 * Adds a header to the queue
 	 *
-	 * @param   string  The header name
-	 * @param   string  The header value
-	 * @param   string  Whether to replace existing value for the header, will never overwrite/be overwritten when false
-	 * @return  $this
+	 * @param   string       $name     The header name
+	 * @param   string       $value    The header value
+	 * @param   string|bool  $replace  Whether to replace existing value for the header, will never overwrite/be overwritten when false
+	 *
+	 * @return  Response
 	 */
 	public function set_header($name, $value, $replace = true)
 	{
@@ -184,9 +253,29 @@ class Response
 	}
 
 	/**
+	 * Adds multiple headers to the queue
+	 *
+	 * @param   array        $headers  Assoc array with header name / value combinations
+	 * @param   string|bool  $replace  Whether to replace existing value for the header, will never overwrite/be overwritten when false
+	 *
+	 * @return  Response
+	 */
+	public function set_headers($headers, $replace = true)
+	{
+		foreach ($headers as $key => $value)
+		{
+			$this->set_header($key, $value, $replace);
+		}
+
+		return $this;
+	}
+
+
+	/**
 	 * Gets header information from the queue
 	 *
-	 * @param   string  The header name, or null for all headers
+	 * @param   string  $name  The header name, or null for all headers
+	 *
 	 * @return  mixed
 	 */
 	public function get_header($name = null)
@@ -204,17 +293,19 @@ class Response
 	/**
 	 * Sets (or returns) the body for the response
 	 *
-	 * @param   string  The response content
-	 * @return  $this|string
+	 * @param   string|bool  $value  The response content
+	 *
+	 * @return  Response|string
 	 */
 	public function body($value = false)
 	{
-		if ($value === false)
+		if (func_num_args())
 		{
-			return $this->body;
+			$this->body = $value;
+			return $this;
 		}
-		$this->body = $value;
-		return $this;
+
+		return $this->body;
 	}
 
 	/**
@@ -262,16 +353,22 @@ class Response
 	 * Sends the response to the output buffer.  Optionally will send the
 	 * headers.
 	 *
-	 * @param   string  $send_headers  Whether to send the headers
-	 * @return  $this
+	 * @param   bool  $send_headers  Whether or not to send the defined HTTP headers
+	 *
+	 * @return  void
 	 */
 	public function send($send_headers = false)
 	{
-		$send_headers and $this->send_headers();
+		$body = $this->__toString();
+
+		if ($send_headers)
+		{
+			$this->send_headers();
+		}
 
 		if ($this->body != null)
 		{
-			echo $this->body;
+			echo $body;
 		}
 	}
 
@@ -282,6 +379,6 @@ class Response
 	 */
 	public function __toString()
 	{
-		return (string) $this->body();
+		return (string) $this->body;
 	}
 }

@@ -1,4 +1,14 @@
 <?php
+/**
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
+ *
+ * @package    Fuel
+ * @version    1.8.2
+ * @author     Fuel Development Team
+ * @license    MIT License
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
+ */
 
 namespace Fuel\Core;
 
@@ -24,8 +34,9 @@ class Lang_Ini extends \Lang_File
 	/**
 	 * Returns the formatted language file contents.
 	 *
-	 * @param   array   $content  language array
+	 * @param   array   $contents  language array
 	 * @return  string  formatted language file contents
+	 * @throws  \LangException
 	 */
 	protected function export_format($contents)
 	{

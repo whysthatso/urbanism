@@ -1,37 +1,50 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
+ */
+
+/**
+ * -----------------------------------------------------------------------------
+ *  [!] NOTICE
+ * -----------------------------------------------------------------------------
+ *
+ *  If you need to make modifications to the default configuration,
+ *  copy this file to your 'app/config' folder, and make them in there.
+ *
+ *  This will allow you to upgrade FuelPHP without losing your custom config.
+ *
  */
 
 return array(
-
 	/**
-	 * Defaults used for formatting options
+	 * -------------------------------------------------------------------------
+	 *  Format
+	 * -------------------------------------------------------------------------
 	 *
-	 * @var   array
+	 *  Defaults used for formatting options.
+	 *
+	 *  See how to use it here (https://fuelphp.com/docs/classes/num.html)
+	 *
 	 */
+
 	'formatting' => array(
-		// Num::format_phone()
 		'phone' => '(000) 000-0000',
-		// Num::smart_format_phone()
+
 		'smart_phone' => array(
 			7  => '000-0000',
 			10 => '(000) 000-0000',
 			11 => '0 (000) 000-0000',
 		),
-		// Num::format_exp()
-		'exp' => '00-00',
-		// Num::mask_credit_card()
+
 		'credit_card' => '**** **** **** 0000',
+
+		'exp' => '00-00',
 	),
-
 );
-
-/* End of file config/num.php */

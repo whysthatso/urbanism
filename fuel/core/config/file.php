@@ -1,84 +1,157 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 /**
- * NOTICE:
+ * -----------------------------------------------------------------------------
+ *  [!] NOTICE
+ * -----------------------------------------------------------------------------
  *
- * If you need to make modifications to the default configuration, copy
- * this file to your app/config folder, and make them in there.
+ *  If you need to make modifications to the default configuration,
+ *  copy this file to your 'app/config' folder, and make them in there.
  *
- * This will allow you to upgrade fuel without losing your custom config.
+ *  This will allow you to upgrade FuelPHP without losing your custom config.
+ *
  */
 
-
 return array(
+	/**
+	 * -------------------------------------------------------------------------
+	 *  Base Configurations
+	 * -------------------------------------------------------------------------
+	 *
+	 *  The default 'File_Area' configurations.
+	 *
+	 */
 
-	// The default File_Area config
 	'base_config' => array(
+		/**
+		 * ---------------------------------------------------------------------
+		 *  Basedir
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Path to 'basedir' restriction. Set to null for no restriction.
+		 *
+		 */
+
+		'basedir' => null,
 
 		/**
-		 * Path to basedir restriction, null for no restriction
+		 * ---------------------------------------------------------------------
+		 *  Extensions
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Allowed extensions. Set to null for allow all extensions.
+		 *
 		 */
-		'basedir'  => null,
+
+		'extensions' => null,
 
 		/**
-		 * array of allowed extensions, null for all
+		 * ---------------------------------------------------------------------
+		 *  URL
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Base URL for files. Set to null to make it unavailable.
+		 *
 		 */
-		'extensions'  => null,
+
+		'url' => null,
 
 		/**
-		 * Base url for files, null for not available
+		 * ---------------------------------------------------------------------
+		 *  File Lock
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Whether or not to use file locks when doing file operations.
+		 *
 		 */
-		'url'  => null,
+
+		'use_locks' => null,
 
 		/**
-		 * Whether or not to use file locks when doing file operations
+		 * ---------------------------------------------------------------------
+		 *  File Handler
+		 * ---------------------------------------------------------------------
+		 *
+		 *  File driver per file extension.
+		 *
 		 */
-		'use_locks'  => null,
 
-		/**
-		 * array containing file driver per file extension
-		 */
-		'file_handlers'  => array(),
+		'file_handlers' => array(),
 	),
 
-	// Pre configure some areas
-	'areas' => array(
-		/* 'area_name' => array(
-			'basedir'        => null,
-			'extensions'     => null,
-			'url'            => null,
-			'use_locks'      => null,
-			'file_handlers'  => array(),
-		), */
-	),
+	/**
+	 * -------------------------------------------------------------------------
+	 *  Areas
+	 * -------------------------------------------------------------------------
+	 *
+	 *  Pre-configure some areas.
+	 *
+	 *  Use these examples to enable:
+	 *
+	 *      'area_name' => array(
+	 *          'basedir'       => null,
+	 *          'extensions'    => null,
+	 *          'url'           => null,
+	 *          'use_locks'     => null,
+	 *          'file_handlers' => array(),
+	 *      )
+	 *
+	 */
 
-	// fileinfo() magic filename
+	'areas' => array(),
+
+	/**
+	 * -------------------------------------------------------------------------
+	 *  Magic File
+	 * -------------------------------------------------------------------------
+	 *
+	 *  The 'fileinfo()' magic filename.
+	 *
+	 */
+
 	'magic_file' => null,
 
-	// default file and directory permissions
+	/**
+	 * -------------------------------------------------------------------------
+	 *  Permissions
+	 * -------------------------------------------------------------------------
+	 *
+	 *  Default file and directory permissions.
+	 *
+	 */
+
 	'chmod' => array(
+		/**
+		 * ---------------------------------------------------------------------
+		 *  Files
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Permissions for newly created files.
+		 *
+		 */
+
+		'files' => 0666,
 
 		/**
-		 * Permissions for newly created files
+		 * ---------------------------------------------------------------------
+		 *  Folders
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Permissions for newly created folders.
+		 *
 		 */
-		'files'  => 0666,
 
-		/**
-		 * Permissions for newly created directories
-		 */
-		'folders'  => 0777,
+		'folders' => 0777,
 	),
-
 );
-
 

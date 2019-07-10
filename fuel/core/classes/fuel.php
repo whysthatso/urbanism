@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -25,11 +25,10 @@ class FuelException extends \Exception {}
  */
 class Fuel
 {
-
 	/**
 	 * @var  string  The version of Fuel
 	 */
-	const VERSION = '1.3';
+	const VERSION = '1.8.2';
 
 	/**
 	 * @var  string  constant used for when in testing mode
@@ -49,7 +48,7 @@ class Fuel
 	/**
 	 * @var  string  constant used for when testing the app in a staging env.
 	 */
-	const STAGE = 'stage';
+	const STAGING = 'staging';
 
 	/**
 	 * @var  int  No logging
@@ -57,29 +56,29 @@ class Fuel
 	const L_NONE = 0;
 
 	/**
-	 * @var  int  Log errors only
+	 * @var  int  Log everything
 	 */
-	const L_ERROR = 1;
-
-	/**
-	 * @var  int  Log warning massages and below
-	 */
-	const L_WARNING = 2;
+	const L_ALL = 99;
 
 	/**
 	 * @var  int  Log debug massages and below
 	 */
-	const L_DEBUG = 3;
+	const L_DEBUG = 100;
 
 	/**
 	 * @var  int  Log info massages and below
 	 */
-	const L_INFO = 4;
+	const L_INFO = 200;
 
 	/**
-	 * @var  int  Log everything
+	 * @var  int  Log warning massages and below
 	 */
-	const L_ALL = 5;
+	const L_WARNING = 300;
+
+	/**
+	 * @var  int  Log errors only
+	 */
+	const L_ERROR = 400;
 
 	/**
 	 * @var  bool  Whether Fuel has been initialized
@@ -101,20 +100,6 @@ class Fuel
 	public static $timezone = 'UTC';
 
 	public static $encoding = 'UTF-8';
-
-	public static $path_cache = array();
-
-	public static $caching = false;
-
-	/**
-	 * The amount of time to cache in seconds.
-	 * @var	int	$cache_lifetime
-	 */
-	public static $cache_lifetime = 3600;
-
-	protected static $cache_dir = '';
-
-	public static $paths_changed = false;
 
 	public static $is_cli = false;
 
@@ -148,34 +133,50 @@ class Fuel
 
 		\Config::load($config);
 
-		// Start up output buffering
-		ob_start(\Config::get('ob_callback', null));
-
-		static::$profiling = \Config::get('profiling', false);
-
-		if (static::$profiling)
+		// Disable output compression if the client doesn't support it
+		if (static::$is_cli or ! in_array('gzip', explode(', ', \Input::headers('Accept-Encoding', ''))))
 		{
-			\Profiler::init();
-			\Profiler::mark(__METHOD__.' Start');
+			\Config::set('ob_callback', null);
 		}
 
-		static::$cache_dir = \Config::get('cache_dir', APPPATH.'cache/');
-		static::$caching = \Config::get('caching', false);
-		static::$cache_lifetime = \Config::get('cache_lifetime', 3600);
+		// Start up output buffering
+		static::$is_cli or ob_start(\Config::get('ob_callback'));
 
-		if (static::$caching)
+		if (\Config::get('caching', false))
 		{
-			\Finder::instance()->read_cache('Fuel::paths');
+			\Finder::instance()->read_cache('FuelFileFinder');
+		}
+
+		// Enable profiling if needed
+		static::$profiling = \Config::get('profiling', false);
+		if (static::$profiling or \Config::get('log_profile_data', false))
+		{
+			\Profiler::init();
 		}
 
 		// set a default timezone if one is defined
-		static::$timezone = \Config::get('default_timezone') ?: date_default_timezone_get();
-		date_default_timezone_set(static::$timezone);
+		try
+		{
+			static::$timezone = \Config::get('default_timezone') ?: date_default_timezone_get();
+			date_default_timezone_set(static::$timezone);
+		}
+		catch (\Exception $e)
+		{
+			date_default_timezone_set('UTC');
+			throw new \PHPErrorException($e->getMessage());
+		}
 
 		static::$encoding = \Config::get('encoding', static::$encoding);
-		MBSTRING and mb_internal_encoding(static::$encoding);
+		MBSTRING and static::$encoding and mb_internal_encoding(static::$encoding);
 
 		static::$locale = \Config::get('locale', static::$locale);
+
+		// Set locale, log warning when it fails
+		if (static::$locale)
+		{
+			setlocale(LC_ALL, static::$locale) or
+				logger(\Fuel::L_WARNING, 'The configured locale '.static::$locale.' is not installed on your system.', __METHOD__);
+		}
 
 		if ( ! static::$is_cli)
 		{
@@ -185,26 +186,37 @@ class Fuel
 			}
 		}
 
-		// Run Input Filtering
-		\Security::clean_input();
-
-		\Event::register('shutdown', 'Fuel::finish');
-
-		// Always load classes, config & language set in always_load.php config
-		static::always_load();
-
 		// Load in the routes
 		\Config::load('routes', true);
 		\Router::add(\Config::get('routes'));
 
-		// Set locale, log warning when it fails
-		if (static::$locale)
+		\Event::register('fuel-shutdown', 'Fuel::finish');
+
+		// Always load classes, config & language set in always_load.php config
+		static::always_load();
+
+		// BC FIX FOR APPLICATIONS <= 1.6.1, makes Redis_Db available as Redis,
+		// like it was in versions before 1.7
+		class_exists('Redis', false) or class_alias('Redis_Db', 'Redis');
+
+		// BC FIX FOR PHP < 7.0 to make the error class available
+		if (PHP_VERSION_ID < 70000)
 		{
-			setlocale(LC_ALL, static::$locale) or
-				logger(\Fuel::L_WARNING, 'The configured locale '.static::$locale.' is not installed on your system.', __METHOD__);
+			// alias the error class to the new errorhandler
+			class_alias('\Fuel\Core\Errorhandler', '\Fuel\Core\Error');
+
+			// does the app have an overloaded Error class?
+			if (class_exists('Error') and is_subclass_of('Error', '\Fuel\Core\Error'))
+			{
+				// then alias that too
+				class_alias('Error', 'Errorhandler');
+			}
 		}
 
 		static::$initialized = true;
+
+		// Run Input Filtering
+		\Security::clean_input();
 
 		// fire any app created events
 		\Event::instance()->has_events('app_created') and \Event::instance()->trigger('app_created', '', 'none');
@@ -224,44 +236,70 @@ class Fuel
 	 */
 	public static function finish()
 	{
-		if (static::$caching)
+		// caching enabled? then save the finder cache
+		if (\Config::get('caching', false))
 		{
-			\Finder::instance()->write_cache('Fuel::paths');
+			\Finder::instance()->write_cache('FuelFileFinder');
 		}
 
+		// profiling enabled?
 		if (static::$profiling)
 		{
-			// Grab the output buffer and flush it, we will rebuffer later
-			$output = ob_get_clean();
+			\Profiler::mark('End of Fuel Execution');
 
-			$headers = headers_list();
-			$show = true;
-
-			foreach ($headers as $header)
+			// write profile data to a logfile if configured
+			if (\Config::get('log_profile_data', false))
 			{
-				if (stripos($header, 'content-type') === 0 and stripos($header, 'text/html') === false)
+				$file = \Log::logfile('', '-profiler-'.date('YmdHis'));
+				if ($handle = @fopen($file, 'w'))
 				{
-					$show = false;
+					if (\Input::is_ajax())
+					{
+						$content = \Format::forge()->to_json(\Profiler::output(true), true);
+					}
+					else
+					{
+						$content = 'return '.var_export(\Profiler::output(true), true);
+					}
+					fwrite($handle, $content);
+					fclose($handle);
 				}
 			}
 
-			if ($show)
+			// for interactive sessions, check if we need to output profiler data
+			if ( ! \Fuel::$is_cli)
 			{
-				\Profiler::mark('End of Fuel Execution');
-				if (preg_match("|</body>.*?</html>|is", $output))
+				$headers = headers_list();
+				$show = true;
+
+				foreach ($headers as $header)
 				{
-					$output  = preg_replace("|</body>.*?</html>|is", '', $output);
-					$output .= \Profiler::output();
-					$output .= '</body></html>';
+					if (stripos($header, 'content-type') === 0 and stripos($header, 'text/html') === false)
+					{
+						$show = false;
+					}
 				}
-				else
+
+				if ($show)
 				{
-					$output .= \Profiler::output();
+					$output = ob_get_clean();
+
+					if (preg_match("|</body>.*?</html>|is", $output))
+					{
+						$output  = preg_replace("|</body>.*?</html>|is", '', $output);
+						$output .= \Profiler::output();
+						$output .= '</body></html>';
+					}
+					else
+					{
+						$output .= \Profiler::output();
+					}
+
+					// restart the output buffer and send the new output
+					ob_start(\Config::get('ob_callback'));
+					echo $output;
 				}
 			}
-			// Restart the output buffer and send the new output
-			ob_start();
-			echo $output;
 		}
 	}
 
@@ -279,7 +317,8 @@ class Fuel
 		}
 		if (\Input::server('script_name'))
 		{
-			$base_url .= str_replace('\\', '/', dirname(\Input::server('script_name')));
+			$common = get_common_path(array(\Input::server('request_uri'), \Input::server('script_name')));
+			$base_url .= $common;
 		}
 
 		// Add a slash if it is missing and return it
@@ -295,101 +334,6 @@ class Fuel
 	public static function load($file)
 	{
 		return include $file;
-	}
-
-	/**
-	 * @deprecated  Keep until v1.3
-	 */
-	public static function add_module($module)
-	{
-		logger(\Fuel::L_WARNING, 'This method is deprecated.  Please use a Module::load() instead.', __METHOD__);
-
-		return \Module::load($module);
-	}
-
-	/**
-	 * @deprecated  Keep until v1.3
-	 */
-	public static function module_exists($module)
-	{
-		logger(\Fuel::L_WARNING, 'This method is deprecated.  Please use a Module::exists() instead.', __METHOD__);
-
-		return \Module::exists($module);
-	}
-
-	/**
-	 * This method does basic filesystem caching.  It is used for things like path caching.
-	 *
-	 * This method is from KohanaPHP's Kohana class.
-	 *
-	 * @param  string  the cache name
-	 * @param  array   the data to cache (if non given it returns)
-	 * @param  int     the number of seconds for the cache too live
-	 */
-	public static function cache($name, $data = null, $lifetime = null)
-	{
-		// Cache file is a hash of the name
-		$file = sha1($name).'.txt';
-
-		// Cache directories are split by keys to prevent filesystem overload
-		$dir = rtrim(static::$cache_dir, DS).DS.$file[0].$file[1].DS;
-
-		if ($lifetime === NULL)
-		{
-			// Use the default lifetime
-			$lifetime = static::$cache_lifetime;
-		}
-
-		if ($data === null)
-		{
-			if (is_file($dir.$file))
-			{
-				if ((time() - filemtime($dir.$file)) < $lifetime)
-				{
-					// Return the cache
-					return unserialize(file_get_contents($dir.$file));
-				}
-				else
-				{
-					try
-					{
-						// Cache has expired
-						unlink($dir.$file);
-					}
-					catch (Exception $e)
-					{
-						// Cache has mostly likely already been deleted,
-						// let return happen normally.
-					}
-				}
-			}
-
-			// Cache not found
-			return NULL;
-		}
-
-		if ( ! is_dir($dir))
-		{
-			// Create the cache directory
-			mkdir($dir, octdec(\Config::get('file.chmod.folders', 0777)), true);
-
-			// Set permissions (must be manually set to fix umask issues)
-			chmod($dir, octdec(\Config::get('file.chmod.folders', 0777)));
-		}
-
-		// Force the data to be a string
-		$data = serialize($data);
-
-		try
-		{
-			// Write the cache
-			return (bool) file_put_contents($dir.$file, $data, LOCK_EX);
-		}
-		catch (Exception $e)
-		{
-			// Failed to write cache
-			return false;
-		}
 	}
 
 	/**
@@ -409,9 +353,9 @@ class Fuel
 		{
 			foreach ($array['classes'] as $class)
 			{
-				if ( ! class_exists($class = ucfirst($class)))
+				if ( ! class_exists($class = \Str::ucwords($class)))
 				{
-					throw new \FuelException('Always load class does not exist. Unable to load: '.$class);
+					throw new \FuelException('Class '.$class.' defined in your "always_load" config could not be loaded.');
 				}
 			}
 		}
@@ -459,8 +403,33 @@ class Fuel
 	 */
 	public static function clean_path($path)
 	{
-		static $search = array(APPPATH, COREPATH, PKGPATH, DOCROOT, '\\');
-		static $replace = array('APPPATH/', 'COREPATH/', 'PKGPATH/', 'DOCROOT/', '/');
+		// framework default paths
+		static $paths = array(
+			'APPPATH/' => APPPATH,
+			'COREPATH/' => COREPATH,
+			'PKGPATH/' => PKGPATH,
+			'DOCROOT/' => DOCROOT,
+			'VENDORPATH/' => VENDORPATH,
+		);
+
+		// storage for the search/replace strings
+		static $search = array();
+		static $replace = array();
+
+		// only do this once
+		if (empty($search))
+		{
+			// additional paths configured than need cleaning
+			$extra = \Config::get('security.clean_paths', array());
+
+			foreach ($paths + $extra as $r => $s)
+			{
+				$search[] = rtrim($s, DS).DS;
+				$replace[] = rtrim($r, DS).DS;
+			}
+		}
+
+		// clean up and return it
 		return str_ireplace($search, $replace, $path);
 	}
 }

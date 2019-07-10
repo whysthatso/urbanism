@@ -1,38 +1,43 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 /**
- * NOTICE:
+ * -----------------------------------------------------------------------------
+ *  [!] NOTICE
+ * -----------------------------------------------------------------------------
  *
- * If you need to make modifications to the default configuration, copy
- * this file to your app/config folder, and make them in there.
+ *  If you need to make modifications to the default configuration,
+ *  copy this file to your app/config folder, and make them in there.
  *
- * This will allow you to upgrade fuel without losing your custom config.
+ *  This will allow you to upgrade FuelPHP without losing your custom config.
+ *
  */
 
-
 return array(
-
 	/**
-	 * ----------------------------------------------------------------------
-	 * global settings
-	 * ----------------------------------------------------------------------
+	 * -------------------------------------------------------------------------
+	 *  Active Driver
+	 * -------------------------------------------------------------------------
 	 */
 
-	// default storage driver
-	'driver'      => 'file',
+	'driver' => 'file',
 
-	// default expiration (null = no expiration)
-	'expiration'  => null,
+	/**
+	 * -------------------------------------------------------------------------
+	 *  Expiration
+	 * -------------------------------------------------------------------------
+	 */
+
+	'expiration' => null,
 
 	/**
 	 * Default content handlers: convert values to strings to be stored
@@ -43,33 +48,111 @@ return array(
 	 */
 
 	/**
-	 * ----------------------------------------------------------------------
-	 * storage driver settings
-	 * ----------------------------------------------------------------------
+	 * -------------------------------------------------------------------------
+	 *  File Driver Settings
+	 * -------------------------------------------------------------------------
+	 *
+	 *  If empty, the default path will be 'application/cache/'
+	 *
 	 */
 
-	// specific configuration settings for the file driver
-	'file'  => array(
-		'path'  =>	'',  // if empty the default will be application/cache/
+	'file' => array(
+		'path' =>	'',
 	),
 
-	// specific configuration settings for the memcached driver
-	'memcached'  => array(
-		'cache_id'  => 'fuel',  // unique id to distinquish fuel cache items from others stored on the same server(s)
-		'servers'   => array(   // array of servers and portnumbers that run the memcached service
-			'default' => array('host' => '127.0.0.1', 'port' => 11211, 'weight' => 100)
+	/**
+	 * -------------------------------------------------------------------------
+	 *  Memcached Driver Settings
+	 * -------------------------------------------------------------------------
+	 */
+
+	'memcached' => array(
+		/**
+		 * ---------------------------------------------------------------------
+		 *  Cache ID
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Unique ID to distinguish fuel cache items from other cache
+		 *  stored on the same server(s).
+		 *
+		 */
+
+		'cache_id'  => 'fuel',
+
+		/**
+		 * ---------------------------------------------------------------------
+		 *  Servers
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Servers and port numbers that run the memcached service.
+		 *
+		 */
+
+		'servers' => array(
+			'default' => array(
+				'host'   => '127.0.0.1',
+				'port'   => 11211,
+				'weight' => 100
+			),
 		),
 	),
 
-	// specific configuration settings for the apc driver
-	'apc'  => array(
-		'cache_id'  => 'fuel',  // unique id to distinquish fuel cache items from others stored on the same server(s)
+	/**
+	 * -------------------------------------------------------------------------
+	 *  APC Driver Settings
+	 * -------------------------------------------------------------------------
+	 */
+
+	'apc' => array(
+		/**
+		 * ---------------------------------------------------------------------
+		 *  Cache ID
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Unique ID to distinguish fuel cache items from other cache
+		 *  stored on the same server(s).
+		 *
+		 */
+
+		'cache_id' => 'fuel',
 	),
 
-	// specific configuration settings for the redis driver
-	'redis'  => array(
-		'database'  => 'default'  // name of the redis database to use (as configured in config/db.php)
+	/**
+	 * -------------------------------------------------------------------------
+	 *  Redis Driver Settings
+	 * -------------------------------------------------------------------------
+	 */
+
+	'redis' => array(
+		/**
+		 * ---------------------------------------------------------------------
+		 *  Database Name
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Name of the redis database to use (as configured in 'config/db.php')
+		 *
+		 */
+
+		'database' => 'default',
+	),
+
+	/**
+	 * -------------------------------------------------------------------------
+	 *  XCache Driver Settings
+	 * -------------------------------------------------------------------------
+	 */
+
+	'xcache' => array(
+		/**
+		 * ---------------------------------------------------------------------
+		 *  Cache ID
+		 * ---------------------------------------------------------------------
+		 *
+		 *  Unique ID to distinguish fuel cache items from other cache
+		 *  stored on the same server(s).
+		 *
+		 */
+
+		'cache_id'  => 'fuel',
 	),
 );
-
-

@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 /**
@@ -21,10 +21,29 @@
 
 return array(
 	'csv' => array(
-		'delimiter' => ',',
-		'enclosure' => '"',
-		'newline'   => "\n",
-		'regex_newline'   => '\n',
-		'escape'    => '\\',
+		'import' => array(
+			'delimiter' => ',',
+			'enclosure' => '"',
+			'newline'   => "\n",
+			'escape'    => '\\',
+		),
+		'export' => array(
+			'delimiter' => ',',
+			'enclosure' => '"',
+			'newline'   => "\n",
+			'escape'    => '\\',
+		),
+		'regex_newline'   => "\n",
+		'enclose_numbers' => true,
+	),
+	'xml' => array(
+		'basenode' => 'xml',
+		'use_cdata' => false,
+		'bool_representation' => null,
+	),
+	'json' => array(
+		'encode' => array(
+			'options' => JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP,
+		),
 	),
 );

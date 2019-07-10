@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -23,7 +23,6 @@ namespace Fuel\Core;
  */
 abstract class Controller_Template extends \Controller
 {
-
 	/**
 	* @var string page template
 	*/
@@ -51,7 +50,7 @@ abstract class Controller_Template extends \Controller
 	public function after($response)
 	{
 		// If nothing was returned default to the template
-		if (empty($response))
+		if ($response === null)
 		{
 			$response = $this->template;
 		}

@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -20,15 +20,18 @@ namespace Fuel\Core;
  */
 class Test_Agent extends TestCase
 {
-
 	/**
 	 * need to setup a fake browser environment
 	 */
 	protected function setUp()
 	{
+		// make sure we've got the Agent class in a known state
 		$_SERVER['HTTP_ACCEPT_LANGUAGE'] = 'en-us,en;q=0.8,nl-be;q=0.5,nl;q=0.3';
 		$_SERVER['HTTP_ACCEPT_CHARSET'] = 'UTF-8,ISO-8859-1,*';
 		$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.16) Gecko/20110322 Fedora/3.6.16-1.fc14 Firefox/3.6.16';
+
+		// by re-running the class init manually
+		\Agent::_init();
 	}
 
 	/**

@@ -1,13 +1,13 @@
 <?php
 /**
- * Fuel is a fast, lightweight, community driven PHP5 framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2011 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Oil;
@@ -57,19 +57,39 @@ class Generate_Scaffold
 		$data['fields'] = array();
 		foreach (array_slice($args, 1) as $arg)
 		{
-			// Parse the argument for each field in a pattern of name:type[constraint]
-			preg_match(static::$fields_regex, $arg, $matches);
-
-			if ( ! isset($matches[1]))
+			// parse the argument for each field in a pattern of name:type[constraint]
+			if (is_string($arg))
 			{
-				throw new Exception('One or more fields were badly specified. Ensure they are name:type');
+				preg_match(static::$fields_regex, $arg, $matches);
+
+				if ( ! isset($matches[1]))
+				{
+					throw new Exception('Unable to determine the field definition for "'.$arg.'". Ensure they are name:type');
+				}
+
+				$data['fields'][] = array(
+					'name'       => \Str::lower($matches[1]),
+					'type'       => isset($matches[2]) ? $matches[2] : 'string',
+					'constraint' => isset($matches[4]) ? $matches[4] : null,
+				);
 			}
 
-			$data['fields'][] = array(
-				'name'       => \Str::lower($matches[1]),
-				'type'       => isset($matches[2]) ? $matches[2] : 'string',
-				'constraint' => isset($matches[4]) ? $matches[4] : null
-			);
+			// argument is an array with a column definition
+			elseif (is_array($arg))
+			{
+				$data['fields'][] = array(
+					'name'       => $arg['name'],
+					'type'       => $arg['type'],
+					'constraint' => $arg['constraint'],
+				);
+			}
+
+			// huh?
+			else
+			{
+				// skip it
+				logger(\Fuel::L_DEBUG, 'Generate_Scaffold::forge(): incorrect argument type passed');
+			}
 		}
 
 		$name = array_shift($args);
@@ -78,14 +98,17 @@ class Generate_Scaffold
 		$controller_name = \Inflector::classify(static::$controller_prefix.str_replace(DS, '_', $name), false);
 
 		// Replace / with _ and classify the rest. Singularize
-		$model_name = \Inflector::classify(static::$model_prefix.str_replace(DS, '_', $name));
+		$model_name = \Inflector::classify(static::$model_prefix.str_replace(DS, '_', $name), ! \Cli::option('singular'));
 
 		// Either foo or folder/foo
-		$view_path = $controller_path = str_replace(
+		$controller_path = str_replace(
 			array('_', '-'),
 			DS,
 			\Str::lower($controller_name)
 		);
+
+		// uri's and view paths have forward slashes, DS is a backslash on Windows
+		$uri = $view_path = str_replace(DS, '/', $controller_path);
 
 		// Models are always singular, tough!
 		$model_path = str_replace(
@@ -94,15 +117,13 @@ class Generate_Scaffold
 			\Str::lower($model_name)
 		);
 
-		// uri's have forward slashes, DS is a backslash on Windows
-		$uri = str_replace(DS, '/', $controller_path);
-
 		$data['include_timestamps'] = ( ! \Cli::option('no-timestamp', false));
 
 		// If a folder is used, the entity is the last part
 		$name_parts = explode(DS, $name);
-		$data['singular_name'] = \Inflector::singularize(end($name_parts));
-		$data['plural_name'] = \Inflector::pluralize($data['singular_name']);
+		$data['singular_name'] = \Cli::option('singular') ? end($name_parts) : \Inflector::singularize(end($name_parts));
+		$data['plural_name'] = \Cli::option('singular') ? $data['singular_name'] : \Inflector::pluralize($data['singular_name']);
+
 		$data['table'] = \Inflector::tableize($model_name);
 		$data['controller_parent'] = static::$controller_parent;
 
@@ -114,16 +135,17 @@ class Generate_Scaffold
 		{
 			if (\Cli::option('mysql-timestamp', false))
 			{
-				$migration_args[] = 'created_at:date';
-				$migration_args[] = 'updated_at:date';
+				$migration_args[] = 'created_at:date:null[1]';
+				$migration_args[] = 'updated_at:date:null[1]';
 			}
 			else
 			{
-				$migration_args[] = 'created_at:int';
-				$migration_args[] = 'updated_at:int';
+				$migration_args[] = 'created_at:int:null[1]';
+				$migration_args[] = 'updated_at:int:null[1]';
 			}
 		}
-		array_unshift($migration_args, 'create_'.\Inflector::pluralize(\Str::lower($name)));
+		$migration_name = \Cli::option('singular') ? \Str::lower($name) : \Inflector::pluralize(\Str::lower($name));
+		array_unshift($migration_args, 'create_'.$migration_name);
 		Generate::migration($migration_args, false);
 
 		// Merge some other data in
@@ -170,26 +192,29 @@ class Generate_Scaffold
 		);
 
 		Generate::create(
-			APPPATH.'classes/controller/'.$controller_path.'.php',
+			APPPATH.'classes'.DS.'controller'.DS.$controller_path.'.php',
 			$controller,
 			'controller'
 		);
+
+		// do we want csrf protection in our forms?
+		$data['csrf'] = \Cli::option('csrf') ? true : false;
 
 		// Create each of the views
 		foreach (array('index', 'view', 'create', 'edit', '_form') as $view)
 		{
 			Generate::create(
-				APPPATH.'views/'.$controller_path.'/'.$view.'.php',
+				APPPATH.'views'.DS.$controller_path.DS.$view.'.php',
 				\View::forge(static::$view_subdir.$subfolder.'/views/actions/'.$view, $data),
 				'view'
 			);
 		}
 
-		// Add the default template if it doesnt exist
-		if ( ! file_exists($app_template = APPPATH.'views/template.php'))
+		// If not generating admin files, add the default template if it doesnt exist
+		if (static::$view_subdir != 'admin/' and  ! is_file($app_template = APPPATH.'views/template.php'))
 		{
 			// check if there's a template in app, and if so, use that
-			if (file_exists(APPPATH.'views/'.static::$view_subdir.$subfolder.'/views/template.php'))
+			if (is_file(APPPATH.'views/'.static::$view_subdir.$subfolder.'/views/template.php'))
 			{
 				Generate::create($app_template, file_get_contents(APPPATH.'views/'.static::$view_subdir.$subfolder.'/views/template.php'), 'view');
 			}

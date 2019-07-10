@@ -1,28 +1,25 @@
 <?php
-
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
- * Image manipulation class.
- *
- * @package		Fuel
- * @version		1.0
- * @license		MIT License
- * @copyright	2010 - 2011 Fuel Development Team
- * @link		http://fuelphp.com
+ * @package    Fuel
+ * @version    1.8.2
+ * @author     Fuel Development Team
+ * @license    MIT License
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
 
 class Image_Imagick extends \Image_Driver
 {
-
 	protected $accepted_extensions = array('png', 'gif', 'jpg', 'jpeg');
-	private $imagick = null;
+	protected $imagick = null;
 
-	public function load($filename, $return_data = false)
+	public function load($filename, $return_data = false, $force_extension = false)
 	{
-		extract(parent::load($filename));
+		extract(parent::load($filename, $return_data, $force_extension));
 
 		if ($this->imagick == null)
 		{
@@ -30,6 +27,23 @@ class Image_Imagick extends \Image_Driver
 		}
 
 		$this->imagick->readImage($filename);
+
+		// deal with exif autorotation
+		$orientation = $this->imagick->getImageOrientation();
+		switch($orientation)
+		{
+			case \Imagick::ORIENTATION_BOTTOMRIGHT:
+				$this->imagick->rotateimage("#000", 180); // rotate 180 degrees
+			break;
+
+			case \Imagick::ORIENTATION_RIGHTTOP:
+				$this->imagick->rotateimage("#000", 90); // rotate 90 degrees CW
+			break;
+
+			case \Imagick::ORIENTATION_LEFTBOTTOM:
+				$this->imagick->rotateimage("#000", -90); // rotate 90 degrees CCW
+			break;
+		}
 
 		return $this;
 	}
@@ -69,13 +83,34 @@ class Image_Imagick extends \Image_Driver
 		$this->imagick->rotateImage($this->create_color('#000', 0), $degrees);
 	}
 
-	protected function _watermark($filename, $position, $padding = 5)
+	protected function _watermark($filename, $position, $padding = array(5,5))
 	{
 		extract(parent::_watermark($filename, $position, $padding));
 		$wmimage = new \Imagick();
 		$wmimage->readImage($filename);
 		$wmimage->evaluateImage(\Imagick::EVALUATE_MULTIPLY, $this->config['watermark_alpha'] / 100, \Imagick::CHANNEL_ALPHA);
 		$this->imagick->compositeImage($wmimage, \Imagick::COMPOSITE_DEFAULT, $x, $y);
+	}
+
+	protected function _flip($direction)
+	{
+		switch ($direction)
+		{
+			case 'vertical':
+			$this->imagick->flipImage();
+			break;
+
+			case 'horizontal':
+			$this->imagick->flopImage();
+			break;
+
+			case 'both':
+			$this->imagick->flipImage();
+			$this->imagick->flopImage();
+			break;
+
+			default: return false;
+		}
 	}
 
 	protected function _border($size, $color = null)
@@ -102,50 +137,30 @@ class Image_Imagick extends \Image_Driver
 		$sizes->width_half = $sizes->width / 2;
 		$sizes->height_half = $sizes->height / 2;
 
-		if ( ! $tl)
-		{
-			$tlimage = $this->imagick->clone();
-			$tlimage->cropImage($sizes->width_half, $sizes->height_half, 0, 0);
+		$list = array();
+		if (!$tl) {
+			$list = array('x' => 0, 'y' => 0);
+		}
+		if (!$tr) {
+			$list = array('x' => $sizes->width_half, 'y' => 0);
+		}
+		if (!$bl) {
+			$list = array('x' => 0, 'y' => $sizes->height_half);
+		}
+		if (!$br) {
+			$list = array('x' => $sizes->width_half, 'y' => $sizes->height_half);
 		}
 
-		if ( ! $tr)
-		{
-			$trimage = $this->imagick->clone();
-			$trimage->cropImage($sizes->width_half, $sizes->height_half, $sizes->width_half, 0);
-		}
-
-		if ( ! $bl)
-		{
-			$blimage = $this->imagick->clone();
-			$blimage->cropImage($sizes->width_half, $sizes->height_half, 0, $sizes->height_half);
-		}
-
-		if ( ! $br)
-		{
-			$brimage = $this->imagick->clone();
-			$brimage->cropImage($sizes->width_half, $sizes->height_half, $sizes->width_half, $sizes->height_half);
+		foreach($list as $index => $element) {
+			$image = $this->imagick->clone();
+			$image->cropImage($sizes->width_half, $sizes->height_half, $element['x'], $element['y']);
+			$list[$index]['image'] = $image;
 		}
 
 		$this->imagick->roundCorners($radius, $radius);
 
-		if ( ! $tl)
-		{
-			$this->imagick->compositeImage($tlimage, \Imagick::COMPOSITE_DEFAULT, 0, 0);
-		}
-
-		if ( ! $tr)
-		{
-			$this->imagick->compositeImage($trimage, \Imagick::COMPOSITE_DEFAULT, $sizes->width_half, 0);
-		}
-
-		if ( ! $bl)
-		{
-			$this->imagick->compositeImage($blimage, \Imagick::COMPOSITE_DEFAULT, 0, $sizes->height_half);
-		}
-
-		if ( ! $br)
-		{
-			$this->imagick->compositeImage($brimage, \Imagick::COMPOSITE_DEFAULT, $sizes->width_half, $sizes->height_half);
+		foreach($list as $element) {
+			$this->imagick->compositeImage($element['image'], \Imagick::COMPOSITE_DEFAULT, $element['x'], $element['y']);
 		}
 	}
 
@@ -160,7 +175,7 @@ class Image_Imagick extends \Image_Driver
 		{
 			return (object) array(
 				'width'  => $this->imagick->getImageWidth(),
-				'height' => $this->imagick->getImageHeight()
+				'height' => $this->imagick->getImageHeight(),
 			);
 		}
 
@@ -168,11 +183,11 @@ class Image_Imagick extends \Image_Driver
 		$tmpimage->readImage($filename);
 		return (object) array(
 			'width'  => $tmpimage->getImageWidth(),
-			'height' => $tmpimage->getImageHeight()
+			'height' => $tmpimage->getImageHeight(),
 		);
 	}
 
-	public function save($filename, $permissions = null)
+	public function save($filename = null, $permissions = null)
 	{
 		extract(parent::save($filename, $permissions));
 
@@ -185,17 +200,17 @@ class Image_Imagick extends \Image_Driver
 		{
 			$filetype = 'jpeg';
 		}
-		
+
 		if ($this->imagick->getImageFormat() != $filetype)
 		{
 			$this->imagick->setImageFormat($filetype);
 		}
-		
+
 		if($this->imagick->getImageFormat() == 'jpeg' and $this->config['quality'] != 100)
 		{
-			$this->imagick->setImageCompression(\Imagick::COMPRESSION_JPEG); 
-			$this->imagick->setImageCompressionQuality($this->config['quality']); 
-			$this->imagick->stripImage(); 
+			$this->imagick->setImageCompression(\Imagick::COMPRESSION_JPEG);
+			$this->imagick->setImageCompressionQuality($this->config['quality']);
+			$this->imagick->stripImage();
 		}
 
 		file_put_contents($filename, $this->imagick->getImageBlob());
@@ -214,7 +229,7 @@ class Image_Imagick extends \Image_Driver
 
 		$this->run_queue();
 		$this->add_background();
-		
+
 		if ($filetype == 'jpg' or $filetype == 'jpeg')
 		{
 			$filetype = 'jpeg';
@@ -224,12 +239,12 @@ class Image_Imagick extends \Image_Driver
 		{
 			$this->imagick->setImageFormat($filetype);
 		}
-		
+
 		if($this->imagick->getImageFormat() == 'jpeg' and $this->config['quality'] != 100)
 		{
-			$this->imagick->setImageCompression(\Imagick::COMPRESSION_JPEG); 
-			$this->imagick->setImageCompressionQuality($this->config['quality']); 
-			$this->imagick->stripImage(); 
+			$this->imagick->setImageCompression(\Imagick::COMPRESSION_JPEG);
+			$this->imagick->setImageCompressionQuality($this->config['quality']);
+			$this->imagick->stripImage();
 		}
 
 		if ( ! $this->config['debug'])
@@ -256,12 +271,17 @@ class Image_Imagick extends \Image_Driver
 	 * Creates a new color usable by Imagick.
 	 *
 	 * @param  string   $hex    The hex code of the color
-	 * @param  integer  $alpha  The alpha of the color, 0 (trans) to 100 (opaque)
+	 * @param  integer  $newalpha  The alpha of the color, 0 (trans) to 100 (opaque)
 	 * @return string   rgba representation of the hex and alpha values.
 	 */
-	protected function create_color($hex, $alpha)
+	protected function create_color($hex, $newalpha = null)
 	{
+		// Convert hex to rgba
 		extract($this->create_hex_color($hex));
+
+		// If a custom alpha was passed, use that
+		isset($newalpha) and $alpha = $newalpha;
+
 		return new \ImagickPixel('rgba('.$red.', '.$green.', '.$blue.', '.round($alpha / 100, 2).')');
 	}
 }

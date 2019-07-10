@@ -1,12 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework. *
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
+ *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -23,7 +24,6 @@ namespace Fuel\Core;
  */
 class Test_Num extends TestCase
 {
-
 	/**
 	 * @see     Num::bytes
 	 */
@@ -36,14 +36,26 @@ class Test_Num extends TestCase
 	}
 
 	/**
+	 * @see     Num::bytes
+	 * @expectedException Exception
+	 */
+	public function test_bytes_exception()
+	{
+		$output = Num::bytes('invalid');
+	}
+
+	/**
 	 * @see     Num::format_bytes
 	 */
 	public function test_format_bytes()
 	{
 		$output = Num::format_bytes('204800');
-		$expected = '200 kB';
+		$expected = '200 KB';
 
 		$this->assertEquals($expected, $output);
+
+		$output = Num::format_bytes('invalid');
+		$this->assertFalse($output);
 	}
 
 	/**
@@ -51,8 +63,24 @@ class Test_Num extends TestCase
 	 */
 	public function test_quantity()
 	{
+		// Return the same
+		$output = Num::quantity('100');
+		$expected = '100';
+
+		$this->assertEquals($expected, $output);
+
 		$output = Num::quantity('7500');
 		$expected = '8K';
+
+		$this->assertEquals($expected, $output);
+
+		$output = Num::quantity('1500000');
+		$expected = '2M';
+
+		$this->assertEquals($expected, $output);
+
+		$output = Num::quantity('1000000000');
+		$expected = '1B';
 
 		$this->assertEquals($expected, $output);
 
@@ -75,6 +103,14 @@ class Test_Num extends TestCase
 		$expected = '(123) 456-7890';
 
 		$this->assertEquals($expected, $output);
+
+		$output = Num::format(null, '(000) 000-0000');
+		$this->assertNull($output);
+
+		$output = Num::format('1234567890', null);
+		$expected = '1234567890';
+
+		$this->assertEquals($expected, $output);
 	}
 
 	/**
@@ -84,6 +120,12 @@ class Test_Num extends TestCase
 	{
 		$output = Num::mask_string('1234567812345678', '**** - **** - **** - 0000', ' -');
 		$expected = '**** - **** - **** - 5678';
+
+		$this->assertEquals($expected, $output);
+
+		// Return the same
+		$output = Num::mask_string('1234567812345678');
+		$expected = '1234567812345678';
 
 		$this->assertEquals($expected, $output);
 	}
@@ -106,6 +148,12 @@ class Test_Num extends TestCase
 	{
 		$output = Num::smart_format_phone('1234567');
 		$expected = '123-4567';
+
+		$this->assertEquals($expected, $output);
+
+		// Return the same
+		$output = Num::smart_format_phone('123456');
+		$expected = '123456';
 
 		$this->assertEquals($expected, $output);
 	}

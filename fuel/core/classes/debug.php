@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -23,7 +23,6 @@ namespace Fuel\Core;
  */
 class Debug
 {
-
 	public static $max_nesting_level = 5;
 
 	public static $js_toggle_open = false;
@@ -53,21 +52,30 @@ class Debug
 		{
 			$backtrace = debug_backtrace();
 
-			// If being called from within, show the file above in the backtrack
-			if (strpos($backtrace[0]['file'], 'core/classes/debug.php') !== FALSE)
+			// locate the first file entry that isn't this class itself
+			foreach ($backtrace as $stack => $trace)
 			{
-				$callee = $backtrace[1];
-				$label = \Inflector::humanize($backtrace[1]['function']);
-			}
-			else
-			{
-				$callee = $backtrace[0];
-				$label = 'Debug';
+				if (isset($trace['file']))
+				{
+					// If being called from within, show the file above in the backtrack
+					if (strpos($trace['file'], 'core/classes/debug.php') !== false)
+					{
+						$callee = $backtrace[$stack+1];
+						$label = \Inflector::humanize($backtrace[$stack+1]['function']);
+					}
+					else
+					{
+						$callee = $trace;
+						$label = 'Debug';
+					}
+
+					$callee['file'] = \Fuel::clean_path($callee['file']);
+
+					break;
+				}
 			}
 
 			$arguments = func_get_args();
-
-			$callee['file'] = \Fuel::clean_path($callee['file']);
 
 			if ( ! static::$js_displayed)
 			{
@@ -76,7 +84,7 @@ class Debug
 JS;
 				static::$js_displayed = true;
 			}
-			echo '<div style="font-size: 13px;background: #EEE !important; border:1px solid #666; color: #000 !important; padding:10px;">';
+			echo '<div class="fuelphp-dump" style="font-size: 13px;background: #EEE !important; border:1px solid #666; color: #000 !important; padding:10px;">';
 			echo '<h1 style="border-bottom: 1px solid #CCC; padding: 0 0 5px 0; margin: 0 0 5px 0; font: bold 120% sans-serif;">'.$callee['file'].' @ line: '.$callee['line'].'</h1>';
 			echo '<pre style="overflow:auto;font-size:100%;">';
 
@@ -105,7 +113,7 @@ JS;
 		$backtrace = debug_backtrace();
 
 		// If being called from within, show the file above in the backtrack
-		if (strpos($backtrace[0]['file'], 'core/classes/debug.php') !== FALSE)
+		if (strpos($backtrace[0]['file'], 'core/classes/debug.php') !== false)
 		{
 			$callee = $backtrace[1];
 			$label = \Inflector::humanize($backtrace[1]['function']);
@@ -128,7 +136,7 @@ JS;
 JS;
 			static::$js_displayed = true;
 		}
-		echo '<div style="font-size: 13px;background: #EEE !important; border:1px solid #666; color: #000 !important; padding:10px;">';
+		echo '<div class="fuelphp-inspect" style="font-size: 13px;background: #EEE !important; border:1px solid #666; color: #000 !important; padding:10px;">';
 		echo '<h1 style="border-bottom: 1px solid #CCC; padding: 0 0 5px 0; margin: 0 0 5px 0; font: bold 120% sans-serif;">'.$callee['file'].' @ line: '.$callee['line'].'</h1>';
 		echo '<pre style="overflow:auto;font-size:100%;">';
 		$i = 0;
@@ -146,10 +154,11 @@ JS;
 	/**
 	 * Formats the given $var's output in a nice looking, Foldable interface.
 	 *
-	 * @param	string	$name	the name of the var
-	 * @param	mixed	$var	the variable
-	 * @param	int		$level	the indentation level
+	 * @param	string	$name			the name of the var
+	 * @param	mixed	$var			the variable
+	 * @param	int		$level			the indentation level
 	 * @param	string	$indent_char	the indentation character
+	 * @param	string	$scope
 	 * @return	string	the formatted string.
 	 */
 	public static function format($name, $var, $level = 0, $indent_char = '&nbsp;&nbsp;&nbsp;&nbsp;', $scope = '')
@@ -158,11 +167,11 @@ JS;
 		if (is_array($var))
 		{
 			$id = 'fuel_debug_'.mt_rand();
-			$return .= "<i>{$scope}</i> <strong>{$name}</strong>";
-			$return .=  " (Array, ".count($var)." element".(count($var)!=1?"s":"").")";
+			$return .= "<i>{$scope}</i> <strong>".htmlentities($name)."</strong>";
+			$return .=  " (Array, ".count($var)." element".(count($var)!=1 ? "s" : "").")";
 			if (count($var) > 0 and static::$max_nesting_level > $level)
 			{
-				$return .= " <a href=\"javascript:fuel_debug_toggle('$id');\" title=\"Click to ".(static::$js_toggle_open?"close":"open")."\">&crarr;</a>\n";
+				$return .= " <a href=\"javascript:fuel_debug_toggle('$id');\" title=\"Click to ".(static::$js_toggle_open ? "close" : "open")."\">&crarr;</a>\n";
 			}
 			else
 			{
@@ -182,7 +191,7 @@ JS;
 				}
 				if (count($var) > 0)
 				{
-					$return .= "<span id=\"$id\" style=\"display: ".(static::$js_toggle_open?"block":"none").";\">$sub_return</span>";
+					$return .= "<span id=\"$id\" style=\"display: ".(static::$js_toggle_open ? "block" : "none").";\">$sub_return</span>";
 				}
 				else
 				{
@@ -193,37 +202,60 @@ JS;
 		}
 		elseif (is_string($var))
 		{
-			$return .= "<i>{$scope}</i> <strong>{$name}</strong> (String): <span style=\"color:#E00000;\">\"{$var}\"</span> (".strlen($var)." characters)\n";
+			$return .= "<i>{$scope}</i> <strong>".htmlentities($name)."</strong> (String): <span style=\"color:#E00000;\">\"".\Security::htmlentities($var)."\"</span> (".strlen($var)." characters)\n";
 		}
 		elseif (is_float($var))
 		{
-			$return .= "<i>{$scope}</i> <strong>{$name}</strong> (Float): {$var}\n";
+			$return .= "<i>{$scope}</i> <strong>".htmlentities($name)."</strong> (Float): {$var}\n";
 		}
 		elseif (is_long($var))
 		{
-			$return .= "<i>{$scope}</i> <strong>{$name}</strong> (Integer): {$var}\n";
+			$return .= "<i>{$scope}</i> <strong>".htmlentities($name)."</strong> (Integer): {$var}\n";
 		}
 		elseif (is_null($var))
 		{
-			$return .= "<i>{$scope}</i> <strong>{$name}</strong> : null\n";
+			$return .= "<i>{$scope}</i> <strong>".htmlentities($name)."</strong> : null\n";
 		}
 		elseif (is_bool($var))
 		{
-			$return .= "<i>{$scope}</i> <strong>{$name}</strong> (Boolean): ".($var ? 'true' : 'false')."\n";
+			$return .= "<i>{$scope}</i> <strong>".htmlentities($name)."</strong> (Boolean): ".($var ? 'true' : 'false')."\n";
 		}
 		elseif (is_double($var))
 		{
-			$return .= "<i>{$scope}</i> <strong>{$name}</strong> (Double): {$var}\n";
+			$return .= "<i>{$scope}</i> <strong>".htmlentities($name)."</strong> (Double): {$var}\n";
 		}
 		elseif (is_object($var))
 		{
+			// dirty hack to get the object id
+			ob_start();
+			var_dump($var);
+			$contents = ob_get_contents();
+			ob_end_clean();
+
+			// process it based on the xdebug presence and configuration
+			if (extension_loaded('xdebug') and ini_get('xdebug.overload_var_dump'))
+			{
+				if (ini_get('html_errors'))
+				{
+					preg_match('~(.*?)\)\[<i>(\d+)(.*)~', $contents, $matches);
+				}
+				else
+				{
+					preg_match('~class (.*?)#(\d+)(.*)~', $contents, $matches);
+				}
+			}
+			else
+			{
+				preg_match('~object\((.*?)#(\d+)(.*)~', $contents, $matches);
+			}
+
 			$id = 'fuel_debug_'.mt_rand();
 			$rvar = new \ReflectionObject($var);
 			$vars = $rvar->getProperties();
-			$return .= "<i>{$scope}</i> <strong>{$name}</strong> (Object): ".get_class($var);
+			$return .= "<i>{$scope}</i> <strong>{$name}</strong> (Object #".$matches[2]."): ".get_class($var);
 			if (count($vars) > 0 and static::$max_nesting_level > $level)
 			{
-				$return .= " <a href=\"javascript:fuel_debug_toggle('$id');\" title=\"Click to ".(static::$js_toggle_open?"close":"open")."\">&crarr;</a>\n";
+				$return .= " <a href=\"javascript:fuel_debug_toggle('$id');\" title=\"Click to ".(static::$js_toggle_open ? "close" : "open")."\">&crarr;</a>\n";
 			}
 			$return .= "\n";
 
@@ -255,7 +287,7 @@ JS;
 
 			if (count($vars) > 0)
 			{
-				$return .= "<span id=\"$id\" style=\"display: ".(static::$js_toggle_open?"block":"none").";\">$sub_return</span>";
+				$return .= "<span id=\"$id\" style=\"display: ".(static::$js_toggle_open ? "block" : "none").";\">$sub_return</span>";
 			}
 			else
 			{
@@ -264,7 +296,7 @@ JS;
 		}
 		else
 		{
-			$return .= "<i>{$scope}</i> <strong>{$name}</strong>: {$var}\n";
+			$return .= "<i>{$scope}</i> <strong>".htmlentities($name)."</strong>: {$var}\n";
 		}
 		return $return;
 	}
@@ -273,16 +305,16 @@ JS;
 	 * Returns the debug lines from the specified file
 	 *
 	 * @access	protected
-	 * @param	string		the file path
-	 * @param	int			the line number
-	 * @param	bool		whether to use syntax highlighting or not
-	 * @param	int			the amount of line padding
+	 * @param	string		$filepath	the file path
+	 * @param	int			$line_num	the line number
+	 * @param	bool		$highlight	whether to use syntax highlighting or not
+	 * @param	int			$padding	the amount of line padding
 	 * @return	array
 	 */
 	public static function file_lines($filepath, $line_num, $highlight = true, $padding = 5)
 	{
-		// deal with eval'd code
-		if (strpos($filepath, 'eval()\'d code') !== false)
+		// deal with eval'd code and runtime-created function
+		if (strpos($filepath, 'eval()\'d code') !== false or strpos($filepath, 'runtime-created function') !== false)
 		{
 			return '';
 		}
@@ -322,9 +354,54 @@ JS;
 		return $debug_lines;
 	}
 
-	public static function backtrace()
+	/**
+	 * Output the call stack from here, or the supplied one.
+	 *
+	 * @param	array	$trace	(optional) A backtrace to output
+	 * @return  string		Formatted backtrace
+	 */
+	public static function backtrace($trace = null)
 	{
-		return static::dump(debug_backtrace());
+		$trace or $trace = debug_backtrace();
+
+		if (\Fuel::$is_cli) {
+			// Special case for CLI since the var_dump of a backtrace is of little use.
+			$str = '';
+			foreach ($trace as $i => $frame)
+			{
+				$line = "#$i\t";
+
+				if ( ! isset($frame['file']))
+				{
+					$line .= "[internal function]";
+				}
+				else
+				{
+					$line .= $frame['file'] . ":" . $frame['line'];
+				}
+
+				$line .= "\t";
+
+				if (isset($frame['function']))
+				{
+					if (isset($frame['class']))
+					{
+						$line .= $frame['class'] . '::';
+					}
+
+					$line .= $frame['function'] . "()";
+				}
+
+				$str .= $line . "\n";
+
+			}
+
+			return $str;
+		}
+		else
+		{
+			return static::dump($trace);
+		}
 	}
 
 	/**
@@ -401,33 +478,8 @@ JS;
 	 */
 	public static function headers()
 	{
-		// deal with fcgi installs on PHP 5.3
-		if (version_compare(PHP_VERSION, '5.4.0') < 0 and  ! function_exists('apache_request_headers'))
-		{
-			$headers = array();
-			foreach (\Input::server() as $name => $value)
-			{
-				if (strpos($name, 'HTTP_') === 0)
-				{
-					$name = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))));
-					$headers[$name] = $value;
-				}
-				elseif ($name == 'CONTENT_TYPE')
-				{
-					$headers['Content-Type'] = $value;
-				}
-				elseif ($name == 'CONTENT_LENGTH')
-				{
-					$headers['Content-Length'] = $value;
-				}
-			}
-		}
-		else
-		{
-			$headers = getAllHeaders();
-		}
-
-		return static::dump($headers);
+		// get the current request headers and dump them
+		return static::dump(\Input::headers());
 	}
 
 	/**
@@ -451,7 +503,10 @@ JS;
 	 * Benchmark anything that is callable
 	 *
 	 * @access public
+	 * @param	callable	$callable
+	 * @param	array		$params
 	 * @static
+	 * @return	array
 	 */
 	public static function benchmark($callable, array $params = array())
 	{
@@ -465,12 +520,12 @@ JS;
 		else
 		{
 			list($usec, $sec) = explode(" ", microtime());
-			$utime_before = ((float)$usec + (float)$sec);
+			$utime_before = ((float) $usec + (float) $sec);
 			$stime_before = 0;
 		}
 
 		// call the function to be benchmarked
-		$result = is_callable($callable) ? call_user_func_array($callable, $params) : null;
+		$result = is_callable($callable) ? call_fuel_func_array($callable, $params) : null;
 
 		// get the after-benchmark time
 		if (function_exists('getrusage'))
@@ -482,16 +537,15 @@ JS;
 		else
 		{
 			list($usec, $sec) = explode(" ", microtime());
-			$utime_after = ((float)$usec + (float)$sec);
+			$utime_after = ((float) $usec + (float) $sec);
 			$stime_after = 0;
 		}
 
 		return array(
 			'user' => sprintf('%1.6f', $utime_after - $utime_before),
 			'system' => sprintf('%1.6f', $stime_after - $stime_before),
-			'result' => $result
+			'result' => $result,
 		);
 	}
 
 }
-

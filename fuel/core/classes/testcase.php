@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -16,4 +16,11 @@ namespace Fuel\Core;
  * A Fuel Specific extension of the PHPUnit TestCase.  This will
  * be used for custom functionality in the future.
  */
-class TestCase extends \PHPUnit_Framework_TestCase { }
+abstract class TestCase extends \PHPUnit_Framework_TestCase
+{
+	// backward compatibility with PHPUnit < v6
+    public function expectException($exception)
+    {
+        self::setExpectedException($exception);
+    }
+}

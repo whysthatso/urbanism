@@ -1,29 +1,34 @@
 <?php
 /**
- * Fuel is a fast, lightweight, community driven PHP5 framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
- * @package		Fuel
- * @version		1.0
- * @author		Fuel Development Team
- * @license		MIT License
- * @copyright	2010 - 2012 Fuel Development Team
- * @link		http://fuelphp.com
+ * @package    Fuel
+ * @version    1.8.2
+ * @author     Fuel Development Team
+ * @license    MIT License
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Orm;
 
-// Exception to throw when validation failed
+/**
+ *  Exception to throw when validation failed
+ */
 class ValidationFailed extends \FuelException
 {
+	/**
+	 * @var  Fieldset the fieldset causing this exception
+	 */
 	protected $fieldset;
 
 	/**
 	 * Overridden \FuelException construct to add a Fieldset instance into the exception
 	 *
-	 * @param string
-	 * @param int
-	 * @param Exception
-	 * @param Fieldset
+	 * @param  string  the error message
+	 * @param  int  the error code
+	 * @param  \Exception any previous exception
+	 * @param  \Fieldset  the fieldset on which this exception was triggered
 	 */
 	public function __construct($message = null, $code = 0, \Exception $previous = null, \Fieldset $fieldset = null)
 	{
@@ -43,20 +48,26 @@ class ValidationFailed extends \FuelException
 	}
 }
 
+/**
+ * Observer class to validate the properties of the model before save.
+ *
+ * It is also used in Fieldset generation based on a model, to populate the fields
+ * and field validation rules of the Fieldset.
+ */
 class Observer_Validation extends Observer
 {
-
 	/**
 	 * Set a Model's properties as fields on a Fieldset, which will be created with the Model's
 	 * classname if none is provided.
 	 *
 	 * @param   string
-	 * @param   Fieldset|null
-	 * @return  Fieldset
+	 * @param   \Fieldset|null
+	 * @return  \Fieldset
 	 */
 	public static function set_fields($obj, $fieldset = null)
 	{
 		static $_generated = array();
+		static $_tabular_rows = array();
 
 		$class = is_object($obj) ? get_class($obj) : $obj;
 		if (is_null($fieldset))
@@ -68,15 +79,29 @@ class Observer_Validation extends Observer
 			}
 		}
 
-		! array_key_exists($class, $_generated) and $_generated[$class] = array();
-		if (in_array($fieldset, $_generated[$class], true))
+		// is our parent fieldset a tabular form set?
+		$tabular_form = is_object($fieldset->parent()) ? $fieldset->parent()->get_tabular_form() : false;
+
+		// don't cache tabular form fieldsets
+		if ( ! $tabular_form)
 		{
-			return $fieldset;
+			! array_key_exists($class, $_generated) and $_generated[$class] = array();
+			if (in_array($fieldset, $_generated[$class], true))
+			{
+				return $fieldset;
+			}
+			$_generated[$class][] = $fieldset;
 		}
-		$_generated[$class][] = $fieldset;
 
 		$primary_keys = is_object($obj) ? $obj->primary_key() : $class::primary_key();
+		$primary_key = count($primary_keys) === 1 ? reset($primary_keys) : false;
 		$properties = is_object($obj) ? $obj->properties() : $class::properties();
+
+		if ($tabular_form and $primary_key and ! is_object($obj))
+		{
+			isset($_tabular_rows[$class]) or $_tabular_rows[$class] = 0;
+		}
+
 		foreach ($properties as $p => $settings)
 		{
 			if (\Arr::get($settings, 'skip', in_array($p, $primary_keys)))
@@ -88,7 +113,7 @@ class Observer_Validation extends Observer
 			{
 				foreach ($settings['form']['options'] as $key => $value)
 				{
-					is_array($value) or $settings['form']['options'][$key] = \Lang::get($value) ?: $value;
+					is_array($value) or $settings['form']['options'][$key] = \Lang::get($value, array(), false) ?: $value;
 				}
 			}
 
@@ -96,7 +121,21 @@ class Observer_Validation extends Observer
 			$attributes = isset($settings['form']) ? $settings['form'] : array();
 			// label is either set in property setting, as part of form attributes or defaults to fieldname
 			$label = isset($settings['label']) ? $settings['label'] : (isset($attributes['label']) ? $attributes['label'] : $p);
-			$label = \Lang::get($label) ?: $label;
+			$label = \Lang::get($label, array(), false) ?: $label;
+
+			// change the fieldname and label for tabular form fieldset children
+			if ($tabular_form and $primary_key)
+			{
+				if (is_object($obj))
+				{
+					$p = $tabular_form.'['.$obj->{$primary_key}.']['.$p.']';
+				}
+				else
+				{
+					$p = $tabular_form.'_new['.$_tabular_rows[$class].']['.$p.']';
+				}
+				$label = '';
+			}
 
 			// create the field and add validation rules
 			$field = $fieldset->add($p, $label, $attributes);
@@ -113,9 +152,15 @@ class Observer_Validation extends Observer
 						array_unshift($args, $rule);
 					}
 
-					call_user_func_array(array($field, 'add_rule'), $args);
+					call_fuel_func_array(array($field, 'add_rule'), $args);
 				}
 			}
+		}
+
+		// increase the row counter for tabular row fieldsets
+		if ($tabular_form and $primary_key and ! is_object($obj))
+		{
+			$_tabular_rows[$class]++;
 		}
 
 		return $fieldset;
@@ -124,18 +169,44 @@ class Observer_Validation extends Observer
 	/**
 	 * Execute before saving the Model
 	 *
-	 * @param   Model
+	 * @param   Model	the model object to validate
+	 *
 	 * @throws  ValidationFailed
 	 */
 	public function before_save(Model $obj)
 	{
-		return $this->validate($obj);
+		$this->validate($obj);
+	}
+
+	/**
+	 * Execute before inserting the row in the database
+	 *
+	 * @param   Model	the model object to validate
+	 *
+	 * @throws  ValidationFailed
+	 */
+	public function before_insert(Model $obj)
+	{
+		$this->validate($obj);
+	}
+
+	/**
+	 * Execute before updating the row in the database
+	 *
+	 * @param   Model	the model object to validate
+	 *
+	 * @throws  ValidationFailed
+	 */
+	public function before_update(Model $obj)
+	{
+		$this->validate($obj);
 	}
 
 	/**
 	 * Validate the model
 	 *
-	 * @param   Model
+	 * @param   Model	the model object to validate
+	 *
 	 * @throws  ValidationFailed
 	 */
 	public function validate(Model $obj)
@@ -143,13 +214,15 @@ class Observer_Validation extends Observer
 		$fieldset = static::set_fields($obj);
 		$val = $fieldset->validation();
 
+		$is_new = $obj->is_new();
+
 		// only allow partial validation on updates, specify the fields for updates to allow null
-		$allow_partial = $obj->is_new() ? false : array();
+		$allow_partial = $is_new ? false : array();
 
 		$input = array();
 		foreach (array_keys($obj->properties()) as $p)
 		{
-			if ( ! in_array($p, $obj->primary_key()) and $obj->is_changed($p))
+			if ( ! in_array($p, $obj->primary_key()) and ($is_new or $obj->is_changed($p)))
 			{
 				$input[$p] = $obj->{$p};
 				is_array($allow_partial) and $allow_partial[] = $p;

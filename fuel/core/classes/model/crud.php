@@ -1,19 +1,19 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
 
-class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
-
+class Model_Crud extends \Model implements \Iterator, \ArrayAccess, \Serializable, \Sanitization
+{
 	/**
 	 * @var  string  $_table_name  The table name (must set this in your Model)
 	 */
@@ -30,6 +30,11 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	// protected static $_connection = null;
 
 	/**
+	 * @var string   $_write_connection   The database connection to use for writes
+	 */
+	// protected static $_write_connection = null;
+
+	/**
 	 * @var  array  $_rules  The validation rules (must set this in your Model to use)
 	 */
 	// protected static $_rules = array();
@@ -38,6 +43,16 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	 * @var  array  $_properties  The table column names (must set this in your Model to use)
 	 */
 	// protected static $_properties = array();
+
+	/**
+	 * @var  array  $_mass_whitelist  The table column names which will be set while using mass assignment like ->set($data)
+	 */
+	// protected static $_mass_whitelist = array();
+
+	/**
+	 * @var  array  $_mass_blacklist  The table column names which will not be set while using mass assignment like ->set($data)
+	 */
+	// protected static $_mass_blacklist = array();
 
 	/**
 	 * @var array  $_labels  Field labels (must set this in your Model to use)
@@ -89,8 +104,9 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	/**
 	 * Finds a row with the given column value.
 	 *
-	 * @param   mixed  $column  The column to search
-	 * @param   mixed  $value   The value to find
+	 * @param   mixed   $column    The column to search
+	 * @param   mixed   $value     The value to find
+	 * @param   string  $operator
 	 * @return  null|object  Either null or a new Model object
 	 */
 	public static function find_one_by($column, $value = null, $operator = '=')
@@ -223,7 +239,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 
 		static::pre_find($query);
 
-		$result =  $query->execute(isset(static::$_connection) ? static::$_connection : null);
+		$result =  $query->execute(static::get_connection());
 		$result = ($result->count() === 0) ? null : $result->as_array($key);
 
 		return static::post_find($result);
@@ -232,23 +248,33 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	/**
 	 * Count all of the rows in the table.
 	 *
-	 * @param   string  Column to count by
-	 * @param   bool    Whether to count only distinct rows (by column)
-	 * @param   array   Query where clause(s)
-	 * @param   string  Column to group by
+	 * @param   string  $column    Column to count by
+	 * @param   bool    $distinct  Whether to count only distinct rows (by column)
+	 * @param   array   $where     Query where clause(s)
+	 * @param   string  $group_by  Column to group by
 	 * @return  int     The number of rows OR false
+	 * @throws \FuelException
 	 */
 	public static function count($column = null, $distinct = true, $where = array(), $group_by = null)
 	{
 		$select = $column ?: static::primary_key();
 
 		// Get the database group / connection
-		$connection = isset(static::$_connection) ? static::$_connection : null;
+		$connection = static::get_connection();
 
 		// Get the columns
-		$columns = \DB::expr('COUNT('.($distinct ? 'DISTINCT ' : '').
-			\Database_Connection::instance($connection)->quote_identifier($select).
-			') AS count_result');
+		if ($connection instanceof \Database_Connection)
+		{
+			$columns = \DB::expr('COUNT('.($distinct ? 'DISTINCT ' : '').
+				$connection->quote_identifier($select).
+				') AS count_result');
+		}
+		else
+		{
+			$columns = \DB::expr('COUNT('.($distinct ? 'DISTINCT ' : '').
+				\Database_Connection::instance($connection)->quote_identifier($select).
+				') AS count_result');
+		}
 
 		// Remove the current select and
 		$query = \DB::select($columns);
@@ -295,7 +321,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	 * @param   string  $name  The method name
 	 * @param   string  $args  The method args
 	 * @return  mixed   Based on static::$return_type
-	 * @throws  BadMethodCallException
+	 * @throws  \BadMethodCallException
 	 */
 	public static function __callStatic($name, $args)
 	{
@@ -308,6 +334,22 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 			return static::find_one_by(substr($name, 12), reset($args));
 		}
 		throw new \BadMethodCallException('Method "'.$name.'" does not exist.');
+	}
+
+	/**
+	 * Get the connection to use for reading or writing
+	 *
+	 * @param  boolean  $writable Get a writable connection
+	 * @return mixed    Database profile name (string) or Database_Connection (object)
+	 */
+	protected static function get_connection($writable = false)
+	{
+		if ($writable and isset(static::$_write_connection))
+		{
+			return static::$_write_connection;
+		}
+
+		return isset(static::$_connection) ? static::$_connection : null;
 	}
 
 	/**
@@ -341,6 +383,11 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	}
 
 	/**
+	 * @var  array  $_data  Data container for this object
+	 */
+	protected $_data = array();
+
+	/**
 	 * @var  bool  $_is_new  If this is a new record
 	 */
 	protected $_is_new = true;
@@ -351,6 +398,11 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	protected $_is_frozen = false;
 
 	/**
+	 * @var  bool  $_sanitization_enabled  If this is a records data will be sanitized on get
+	 */
+	protected $_sanitization_enabled = false;
+
+	/**
 	 * @var  object  $_validation  The validation instance
 	 */
 	protected $_validation = null;
@@ -359,21 +411,14 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	 * Sets up the object.
 	 *
 	 * @param   array  $data  The data array
-	 * @return  void
 	 */
 	public function __construct(array $data = array())
 	{
-		if (isset($this->{static::primary_key()}))
+		$this->set($data);
+
+		if (isset($this->_data[static::primary_key()]))
 		{
 			$this->is_new(false);
-		}
-
-		if ( ! empty($data))
-		{
-			foreach ($data as $key => $value)
-			{
-				$this->{$key} = $value;
-			}
 		}
 	}
 
@@ -386,7 +431,44 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	 */
 	public function __set($property, $value)
 	{
-		$this->{$property} = $value;
+		$this->_data[$property] = $value;
+	}
+
+	/**
+	 * Magic getter to fetch data from the data container
+	 *
+	 * @param   string  $property  The property name
+	 * @return  mixed
+	 */
+	public function __get($property)
+	{
+		if (array_key_exists($property, $this->_data))
+		{
+			return $this->_sanitization_enabled ? \Security::clean($this->_data[$property], null, 'security.output_filter') : $this->_data[$property];
+		}
+
+		throw new \OutOfBoundsException('Property "'.$property.'" not found for '.get_called_class().'.');
+	}
+
+	/**
+	 * Magic isset to check if values exist
+	 *
+	 * @param   string  $property  The property name
+	 * @return  bool  whether or not the property exists
+	 */
+	public function __isset($property)
+	{
+		return isset($this->_data[$property]);
+	}
+
+	/**
+	 * Magic unset to remove existing properties
+	 *
+	 * @param   string  $property  The property name
+	 */
+	public function __unset($property)
+	{
+		unset($this->_data[$property]);
 	}
 
 	/**
@@ -399,7 +481,19 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	{
 		foreach ($data as $key => $value)
 		{
-			$this->{$key} = $value;
+			if (isset(static::$_mass_whitelist))
+			{
+				in_array($key, static::$_mass_whitelist) and $this->_data[$key] = $value;
+			}
+			elseif (isset(static::$_mass_blacklist))
+			{
+				( ! in_array($key, static::$_mass_blacklist)) and $this->_data[$key] = $value;
+			}
+			else
+			{
+				// no static::$_mass_whitelist or static::$_mass_blacklist set, proceed with default behavior
+				$this->_data[$key] = $value;
+			}
 		}
 		return $this;
 	}
@@ -408,8 +502,9 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	 * Saves the object to the database by either creating a new record
 	 * or updating an existing record. Sets the default values if set.
 	 *
-	 * @param   bool   $validate  wether to validate the input
-	 * @return  mixed  Rows affected and or insert ID
+	 * @param   bool   $validate  whether to validate the input
+	 * @return  array|int  Rows affected and or insert ID
+	 * @throws \Exception
 	 */
 	public function save($validate = true)
 	{
@@ -418,12 +513,12 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 			throw new \Exception('Cannot modify a frozen row.');
 		}
 
-		$vars = $this->to_array();
+		$vars = $this->_data;
 
 		// Set default if there are any
 		isset(static::$_defaults) and $vars = $vars + static::$_defaults;
 
-		if ($validate and isset(static::$_rules) and count(static::$_rules) > 0)
+		if ($validate and isset(static::$_rules) and ! empty(static::$_rules))
 		{
 			$vars = $this->pre_validate($vars);
 			$validated = $this->post_validate($this->run_validation($vars));
@@ -433,6 +528,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 				$validated = array_filter($this->validation()->validated(), function($val){
 					return ($val !== null);
 				});
+
 				$vars = $validated + $vars;
 			}
 			else
@@ -478,7 +574,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 			            ->set($vars);
 
 			$this->pre_save($query);
-			$result = $query->execute(isset(static::$_connection) ? static::$_connection : null);
+			$result = $query->execute(static::get_connection(true));
 
 			if ($result[1] > 0)
 			{
@@ -500,7 +596,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 		         ->where(static::primary_key(), '=', $this->{static::primary_key()});
 
 		$this->pre_update($query);
-		$result = $query->execute(isset(static::$_connection) ? static::$_connection : null);
+		$result = $query->execute(static::get_connection(true));
 		$result > 0 and $this->set($vars);
 
 		return $this->post_update($result);
@@ -518,7 +614,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 		            ->where(static::primary_key(), '=', $this->{static::primary_key()});
 
 		$this->pre_delete($query);
-		$result = $query->execute(isset(static::$_connection) ? static::$_connection : null);
+		$result = $query->execute(static::get_connection(true));
 
 		return $this->post_delete($result);
 	}
@@ -544,7 +640,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	/**
 	 * Either checks if the record is frozen or sets whether it is frozen or not.
 	 *
-	 * @param   bool|null  $new  Whether this is a frozen record
+	 * @param   bool|null  $frozen  Whether this is a frozen record
 	 * @return  bool|$this
 	 */
 	public function frozen($frozen = null)
@@ -557,6 +653,40 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 		$this->_is_frozen = (bool) $frozen;
 
 		return $this;
+	}
+
+	/**
+	 * Enable sanitization mode in the object
+	 *
+	 * @return  $this
+	 */
+	public function sanitize()
+	{
+		$this->_sanitization_enabled = true;
+
+		return $this;
+	}
+
+	/**
+	 * Disable sanitization mode in the object
+	 *
+	 * @return  $this
+	 */
+	public function unsanitize()
+	{
+		$this->_sanitization_enabled = false;
+
+		return $this;
+	}
+
+	/**
+	 * Returns the current sanitization state of the object
+	 *
+	 * @return  bool
+	 */
+	public function sanitized()
+	{
+		return $this->_sanitization_enabled;
 	}
 
 	/**
@@ -590,39 +720,44 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	 */
 	public function to_array()
 	{
-		return get_object_public_vars($this);
+		return $this->_data;
 	}
 
 	/**
 	 * Implementation of the Iterator interface
 	 */
 
-	protected $_iterable = array();
-
 	public function rewind()
 	{
-		$this->_iterable = $this->to_array();
-		reset($this->_iterable);
+		reset($this->_data);
 	}
 
 	public function current()
 	{
-		return current($this->_iterable);
+		if ($this->_sanitization_enabled)
+		{
+			return \Security::clean(current($this->_data), null, 'security.output_filter');
+		}
+		return current($this->_data);
 	}
 
 	public function key()
 	{
-		return key($this->_iterable);
+		return key($this->_data);
 	}
 
 	public function next()
 	{
-		return next($this->_iterable);
+		if ($this->_sanitization_enabled)
+		{
+			return \Security::clean(next($this->_data), null, 'security.output_filter');
+		}
+		return next($this->_data);
 	}
 
 	public function valid()
 	{
-		return key($this->_iterable) !== null;
+		return key($this->_data) !== null;
 	}
 
 	/**
@@ -634,7 +769,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	 */
 	public function offsetSet($offset, $value)
 	{
-		$this->{$offset} = $value;
+		$this->_data[$offset] = $value;
 	}
 
 	/**
@@ -645,7 +780,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	 */
 	public function offsetExists($offset)
 	{
-		return property_exists($this, $offset);
+		return array_key_exists($offset, $this->_data);
 	}
 
 	/**
@@ -656,7 +791,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	 */
 	public function offsetUnset($offset)
 	{
-		unset($this->{$offset});
+		unset($this->_data[$offset]);
 	}
 
 	/**
@@ -667,18 +802,22 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 	 */
 	public function offsetGet($offset)
 	{
-		if (property_exists($this, $offset))
+		if (array_key_exists($offset, $this->_data))
 		{
-			return $this->{$offset};
+			if ($this->_sanitization_enabled)
+			{
+				return \Security::clean($this->_data[$offset], null, 'security.output_filter');
+			}
+			return $this->_data[$offset];
 		}
 
 		throw new \OutOfBoundsException('Property "'.$offset.'" not found for '.get_called_class().'.');
 	}
 
 	/**
-	 * Returns wether the instance will pass validation.
+	 * Returns whether the instance will pass validation.
 	 *
-	 * @return  bool  wether the instance passed validation
+	 * @return  bool  whether the instance passed validation
 	 */
 	public function validates()
 	{
@@ -687,7 +826,7 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 			return true;
 		}
 
-		$vars = $this->to_array();
+		$vars = $this->_data;
 
 		// Set default if there are any
 		isset(static::$_defaults) and $vars = $vars + static::$_defaults;
@@ -809,4 +948,51 @@ class Model_Crud extends \Model implements \Iterator, \ArrayAccess {
 		return $values;
 	}
 
+	/**
+	 * Serializable implementation: serialize
+	 *
+	 * @return  array  model data
+	 */
+	public function serialize()
+	{
+		$data = $this->_data;
+
+		$data['_is_new'] = $this->_is_new;
+		$data['_is_frozen'] = $this->_is_frozen;
+
+		return serialize($data);
+	}
+
+	/**
+	 * Serializable implementation: unserialize
+	 *
+	 * @param   string  $data
+	 * @return  array   model data
+	 */
+	public function unserialize($data)
+	{
+		$data = unserialize($data);
+
+		if (isset($data['_is_new']))
+		{
+			$this->is_new = $data['_is_new'];
+			unset($data['_is_new']);
+		}
+		else
+		{
+			$this->_is_new = true;
+		}
+
+		if (isset($data['_is_frozen']))
+		{
+			$this->_is_frozen = $data['_is_frozen'];
+			unset($data['_is_frozen']);
+		}
+		else
+		{
+			$this->_is_frozen = false;
+		}
+
+		$this->_data = $data;
+	}
 }

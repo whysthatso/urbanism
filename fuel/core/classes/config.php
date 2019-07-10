@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -27,11 +27,6 @@ class Config
 	public static $items = array();
 
 	/**
-	 * @var    string    $default_check_value          random value used as a not-found check in get()
-	 */
-	public static $default_check_value;
-
-	/**
 	 * @var    array    $itemcache       the dot-notated item cache
 	 */
 	protected static $itemcache = array();
@@ -41,91 +36,161 @@ class Config
 	 *
 	 * @param    mixed    $file         string file | config array | Config_Interface instance
 	 * @param    mixed    $group        null for no group, true for group is filename, false for not storing in the master config
+	 * @param    bool     $reload       true to force a reload even if the file is already loaded
 	 * @param    bool     $overwrite    true for array_merge, false for \Arr::merge
 	 * @return   array                  the (loaded) config array
+	 * @throws  \FuelException
 	 */
 	public static function load($file, $group = null, $reload = false, $overwrite = false)
 	{
-		if ( ! $reload and
-		     ! is_array($file) and
-		     ! is_object($file) and
-		    array_key_exists($file, static::$loaded_files))
-		{
-			if ($group === null or $group === false or ! isset(static::$items[$group]))
-			{
-				return false;
-			}
-			$group === true and $group = $file;
-			return static::$items[$group];
-		}
-
+		// storage for the config
 		$config = array();
-		if (is_array($file))
+
+		// Config_Instance class
+		$class = null;
+
+		// name of the config group
+		$name = $group === true ? $file : ($group === null ? null : $group);
+
+		// need to store flag
+		$cache = ($group !== false);
+
+		// process according to input type
+		if ( ! empty($file))
 		{
-			$config = $file;
-		}
-		elseif (is_string($file))
-		{
-			$info = pathinfo($file);
-			$type = 'php';
-			if (isset($info['extension']))
+			// we've got a config filename
+			if (is_string($file))
 			{
-				$type = $info['extension'];
-				// Keep extension when it's an absolute path, because the finder won't add it
-				if ($file[0] !== '/' and $file[1] !== ':')
+				// if we have this config in cache, load it
+				if ( ! $reload and
+					array_key_exists($file, static::$loaded_files))
 				{
-					$file = substr($file, 0, -(strlen($type) + 1));
+					if ($group !== false and $name !== null and isset(static::$items[$name]))
+					{
+						// fetch the cached config
+						$config = static::$items[$name];
+					}
+					else
+					{
+						// no config fetched
+						$config = false;
+					}
+
+					// we don't want to cache this config later!
+					$cache = false;
+				}
+
+				// if not, construct a Config instance and load it
+				else
+				{
+					$info = pathinfo($file);
+					$type = 'php';
+					if (isset($info['extension']))
+					{
+						$type = $info['extension'];
+						// Keep extension when it's an absolute path, because the finder won't add it
+						if ($file[0] !== '/' and $file[1] !== ':')
+						{
+							$file = substr($file, 0, -(strlen($type) + 1));
+						}
+					}
+					$class = '\\Config_'.ucfirst($type);
+
+					if (class_exists($class))
+					{
+						static::$loaded_files[$file] = true;
+						$class = new $class($file);
+					}
+					else
+					{
+						throw new \FuelException(sprintf('Invalid config type "%s".', $type));
+					}
 				}
 			}
-			$class = '\\Config_'.ucfirst($type);
 
-			if (class_exists($class))
+			// we've got an array of config data
+			elseif (is_array($file))
 			{
-				static::$loaded_files[$file] = true;
-				$file = new $class($file);
+				$config = $file;
 			}
+
+			// we've got an already created Config instance class
+			elseif ($file instanceOf Config_Interface)
+			{
+				$class = $file;
+			}
+
+			// don't know what we got, bail out
 			else
 			{
-				throw new \FuelException(sprintf('Invalid config type "%s".', $type));
+				throw new \FuelException(sprintf('Invalid config file argument'));
 			}
-		}
 
-		if ($file instanceof Config_Interface)
-		{
-			try
+			// if we have a Config instance class?
+			if (is_object($class))
 			{
-				$config = $file->load($overwrite);
-			}
-			catch (\ConfigException $e)
-			{
-				$config = array();
-			}
-			$group = $group === true ? $file->group() : $group;
-		}
-
-		if ($group === null)
-		{
-			static::$items = $reload ? $config : ($overwrite ? array_merge(static::$items, $config) : \Arr::merge(static::$items, $config));
-			static::$itemcache = array();
-		}
-		else
-		{
-			$group = ($group === true) ? $file : $group;
-			if ( ! isset(static::$items[$group]) or $reload)
-			{
-				static::$items[$group] = array();
-			}
-			static::$items[$group] = $overwrite ? array_merge(static::$items[$group],$config) : \Arr::merge(static::$items[$group],$config);
-			$group .= '.';
-			foreach (static::$itemcache as $key => $value)
-			{
-				if (strpos($key, $group) === 0)
+				// then load its config
+ 				try
 				{
-					unset(static::$itemcache[$key]);
+					$config = $class->load($overwrite, ! $reload);
+				}
+				catch (\ConfigException $e)
+				{
+					$config = false;
+				}
+
+				// and update the group if needed
+				if ($group === true)
+				{
+					$name = $class->group();
 				}
 			}
 		}
 
+		// no arguments?
+		else
+		{
+			throw new \FuelException(sprintf('No valid config file argument given'));
+		}
+
+		// do we have a valid config loaded and do we need to cache it?
+		if ( ! empty($config) and $cache)
+		{
+			// do we need to load it in the global config?
+			if ($name === null)
+			{
+				static::$items = $reload ? $config : ($overwrite ? array_merge(static::$items, $config) : \Arr::merge(static::$items, $config));
+				static::$itemcache = array();
+			}
+
+			// or in a named config
+			else
+			{
+				if ( ! isset(static::$items[$name]) or $reload)
+				{
+					static::$items[$name] = array();
+				}
+
+				if ($overwrite)
+				{
+					\Arr::set(static::$items, $name, array_merge(\Arr::get(static::$items, $name, array()), $config));
+				}
+				else
+				{
+					\Arr::set(static::$items, $name, \Arr::merge(\Arr::get(static::$items, $name, array()), $config));
+				}
+
+				foreach (static::$itemcache as $key => $value)
+				{
+					if (strpos($key, $name) === 0)
+					{
+						unset(static::$itemcache[$key]);
+					}
+				}
+			}
+		}
+
+		// return the fetched config
 		return $config;
 	}
 
@@ -135,6 +200,7 @@ class Config
 	 * @param   string          $file      desired file name
 	 * @param   string|array    $config    master config array key or config array
 	 * @return  bool                       false when config is empty or invalid else \File::update result
+	 * @throws  \FuelException
 	 */
 	public static function save($file, $config)
 	{
@@ -147,22 +213,29 @@ class Config
 			$config = static::$items[$config];
 		}
 
-		$type = pathinfo($file, PATHINFO_EXTENSION);
-		if( ! $type)
+		$info = pathinfo($file);
+		$type = 'php';
+
+		if (isset($info['extension']))
 		{
-			$type = 'php';
-			$file .= '.'.$type;
+			$type = $info['extension'];
+			// Keep extension when it's an absolute path, because the finder won't add it
+			if ($file[0] !== '/' and $file[1] !== ':')
+			{
+				$file = substr($file, 0, -(strlen($type) + 1));
+			}
 		}
 
 		$class = '\\Config_'.ucfirst($type);
 
-		if( ! class_exists($class, true))
+		if ( ! class_exists($class))
 		{
-			throw new \ConfigException('Cannot save a config file of type: '.$type);
+			throw new \FuelException(sprintf('Invalid config type "%s".', $type));
 		}
 
-		$driver = new $class;
-		return $driver->save($file, $config);
+		$driver = new $class($file);
+
+		return $driver->save($config);
 	}
 
 	/**
@@ -174,17 +247,19 @@ class Config
 	 */
 	public static function get($item, $default = null)
 	{
-		is_null(static::$default_check_value) and static::$default_check_value = pack('H*', 'DEADBEEFCAFE');
-
-		if (isset(static::$items[$item]))
+		if (array_key_exists($item, static::$items))
 		{
 			return static::$items[$item];
 		}
-		elseif ( ! isset(static::$itemcache[$item]))
+		elseif ( ! array_key_exists($item, static::$itemcache))
 		{
-			$val = \Fuel::value(\Arr::get(static::$items, $item, static::$default_check_value));
+			// cook up something unique
+			$miss = new \stdClass();
 
-			if ($val === static::$default_check_value)
+			$val = \Arr::get(static::$items, $item, $miss);
+
+			// so we can detect a miss here...
+			if ($val === $miss)
 			{
 				return $default;
 			}
@@ -192,27 +267,26 @@ class Config
 			static::$itemcache[$item] = $val;
 		}
 
-		return static::$itemcache[$item];
+		return \Fuel::value(static::$itemcache[$item]);
 	}
 
 	/**
 	 * Sets a (dot notated) config item
 	 *
-	 * @param    string    a (dot notated) config key
-	 * @param    mixed     the config value
-	 * @return   void      the \Arr::set result
+	 * @param    string   $item   a (dot notated) config key
+	 * @param    mixed    $value  the config value
 	 */
 	public static function set($item, $value)
 	{
 		strpos($item, '.') === false or static::$itemcache[$item] = $value;
-		return \Arr::set(static::$items, $item, \Fuel::value($value));
+		\Arr::set(static::$items, $item, $value);
 	}
 
 	/**
 	 * Deletes a (dot notated) config item
 	 *
-	 * @param    string       a (dot notated) config key
-	 * @return   array|bool   the \Arr::delete result, success boolean or array of success booleans
+	 * @param    string       $item  a (dot notated) config key
+	 * @return   array|bool          the \Arr::delete result, success boolean or array of success booleans
 	 */
 	public static function delete($item)
 	{

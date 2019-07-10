@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -22,7 +22,6 @@ namespace Fuel\Core;
  */
 class Form_Instance
 {
-
 	/**
 	 * Valid types for input tags (including HTML5)
 	 */
@@ -31,7 +30,7 @@ class Form_Instance
 		'datetime-local', 'email', 'file', 'hidden', 'image',
 		'month', 'number', 'password', 'radio', 'range',
 		'reset', 'search', 'submit', 'tel', 'text', 'time',
-		'url', 'week'
+		'url', 'week',
 	);
 
 	/**
@@ -60,8 +59,9 @@ class Form_Instance
 	/**
 	 * Set form attribute
 	 *
-	 * @param  string
-	 * @param  mixed
+	 * @param  string  $key
+	 * @param  mixed   $value
+	 * @return  \Form_Instance
 	 */
 	public function set_attribute($key, $value)
 	{
@@ -75,8 +75,9 @@ class Form_Instance
 	/**
 	 * Get form attribute
 	 *
-	 * @param  string
-	 * @param  mixed
+	 * @param  string  $key
+	 * @param  mixed   $default
+	 * @return mixed
 	 */
 	public function get_attribute($key, $default = null)
 	{
@@ -98,19 +99,20 @@ class Form_Instance
 	/**
 	 * Create a form open tag
 	 *
-	 * @param   string|array  action string or array with more tag attribute settings
+	 * @param   string|array  $attributes  action string or array with more tag attribute settings
+	 * @param   array         $hidden
 	 * @return  string
 	 */
 	public function open($attributes = array(), array $hidden = array())
 	{
-		$attributes = ! is_array($attributes) ? array('action' => $attributes) : $attributes;
+		$attributes = is_array($attributes) ? $attributes : array('action' => $attributes);
+		$attributes += ($this->get_config('form_attributes') ?: array());
 
 		// If there is still no action set, Form-post
-		if( ! array_key_exists('action', $attributes) or $attributes['action'] === null)
+		if( ! array_key_exists('action', $attributes) or empty($attributes['action']))
 		{
 			$attributes['action'] = \Uri::main();
 		}
-
 
 		// If not a full URL, create one
 		elseif ( ! strpos($attributes['action'], '://'))
@@ -139,6 +141,12 @@ class Form_Instance
 			$form .= PHP_EOL.$this->hidden($field, $value);
 		}
 
+		// Add CSRF token automatically
+		if (Config::get('security.csrf_auto_token', false))
+		{
+			$form .= PHP_EOL.\Form::csrf();
+		}
+
 		return $form;
 	}
 
@@ -155,8 +163,8 @@ class Form_Instance
 	/**
 	 * Create a fieldset open tag
 	 *
-	 * @param   array   array with tag attribute settings
-	 * @param   string  string for the fieldset legend
+	 * @param   array   $attributes  array with tag attribute settings
+	 * @param   string  $legend      string for the fieldset legend
 	 * @return  string
 	 */
 	public function fieldset_open($attributes = array(), $legend = null)
@@ -185,9 +193,9 @@ class Form_Instance
 	/**
 	 * Create a form input
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $value
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function input($field, $value = null, array $attributes = array())
@@ -230,9 +238,9 @@ class Form_Instance
 	/**
 	 * Create a hidden field
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $value
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function hidden($field, $value = null, array $attributes = array())
@@ -254,9 +262,9 @@ class Form_Instance
 	/**
 	 * Create a password input field
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $value
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function password($field, $value = null, array $attributes = array())
@@ -278,10 +286,10 @@ class Form_Instance
 	/**
 	 * Create a radio button
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string
-	 * @param   mixed         either attributes (array) or bool/string to set checked status
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $value
+	 * @param   mixed         $checked     either attributes (array) or bool/string to set checked status
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function radio($field, $value = null, $checked = null, array $attributes = array())
@@ -300,9 +308,12 @@ class Form_Instance
 			if ( ! is_array($checked))
 			{
 				// If it's true, then go for it
-				if (is_bool($checked) and $checked === true)
+				if (is_bool($checked))
 				{
-					$attributes['checked'] = 'checked';
+					if($checked === true)
+					{
+						$attributes['checked'] = 'checked';
+					}
 				}
 
 				// Otherwise, if the string/number/whatever matches then do it
@@ -320,10 +331,10 @@ class Form_Instance
 	/**
 	 * Create a checkbox
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string
-	 * @param   mixed         either attributes (array) or bool/string to set checked status
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $value
+	 * @param   mixed         $checked     either attributes (array) or bool/string to set checked status
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function checkbox($field, $value = null, $checked = null, array $attributes = array())
@@ -342,9 +353,12 @@ class Form_Instance
 			if ( ! is_array($checked))
 			{
 				// If it's true, then go for it
-				if (is_bool($checked) and $checked === true)
+				if (is_bool($checked))
 				{
-					$attributes['checked'] = 'checked';
+					if($checked === true)
+					{
+						$attributes['checked'] = 'checked';
+					}
 				}
 
 				// Otherwise, if the string/number/whatever matches then do it
@@ -362,8 +376,8 @@ class Form_Instance
 	/**
 	 * Create a file upload input field
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function file($field, array $attributes = array())
@@ -384,9 +398,9 @@ class Form_Instance
 	/**
 	 * Create a button
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $value
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function button($field, $value = null, array $attributes = array())
@@ -408,9 +422,9 @@ class Form_Instance
 	/**
 	 * Create a reset button
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $value
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function reset($field = 'reset', $value = 'Reset', array $attributes = array())
@@ -432,9 +446,9 @@ class Form_Instance
 	/**
 	 * Create a submit button
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $value
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function submit($field = 'submit', $value = 'Submit', array $attributes = array())
@@ -456,9 +470,9 @@ class Form_Instance
 	/**
 	 * Create a textarea field
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $value
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function textarea($field, $value = null, array $attributes = array())
@@ -472,8 +486,7 @@ class Form_Instance
 			$attributes['name'] = (string) $field;
 			$attributes['value'] = (string) $value;
 		}
-
-		$value = empty($attributes['value']) ? '' : $attributes['value'];
+		$value = is_scalar($attributes['value']) ? $attributes['value'] : '';
 		unset($attributes['value']);
 
 		if ($this->get_config('prep_value', true) && empty($attributes['dont_prep']))
@@ -495,10 +508,10 @@ class Form_Instance
 	 *
 	 * Generates a html select element based on the given parameters
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string  selected value(s)
-	 * @param   array   array of options and option groups
-	 * @param   array
+	 * @param   string|array  $field       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $values      selected value(s)
+	 * @param   array         $options     array of options and option groups
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function select($field, $values = null, array $options = array(), array $attributes = array())
@@ -509,16 +522,17 @@ class Form_Instance
 
 			if ( ! isset($attributes['selected']))
 			{
-				$attributes['selected'] = ! isset($attributes['value']) ? null : $attributes['value'];
+				$attributes['selected'] = ! isset($attributes['value']) ? (isset($attributes['default']) ? $attributes['default'] : null) : $attributes['value'];
 			}
 		}
 		else
 		{
 			$attributes['name'] = (string) $field;
-			$attributes['selected'] = $values;
+			$attributes['selected'] = ($values === null or $values === array()) ? (isset($attributes['default']) ? $attributes['default'] : $values) : $values;
 			$attributes['options'] = $options;
 		}
 		unset($attributes['value']);
+		unset($attributes['default']);
 
 		if ( ! isset($attributes['options']) || ! is_array($attributes['options']))
 		{
@@ -537,7 +551,7 @@ class Form_Instance
 		// workaround to access the current object context in the closure
 		$current_obj =& $this;
 
-		// closure to recusively process the options array
+		// closure to recursively process the options array
 		$listoptions = function (array $options, $selected, $level = 1) use (&$listoptions, &$current_obj, &$attributes)
 		{
 			$input = PHP_EOL;
@@ -547,12 +561,13 @@ class Form_Instance
 				{
 					$optgroup = $listoptions($val, $selected, $level + 1);
 					$optgroup .= str_repeat("\t", $level);
-					$input .= str_repeat("\t", $level).html_tag('optgroup', array('label' => $key , 'style' => 'text-indent: '.(10*($level-1)).'px;'), $optgroup).PHP_EOL;
+					$input .= str_repeat("\t", $level).html_tag('optgroup', array('label' => $key, 'style' => 'text-indent: '.(20+10*($level-1)).'px;'), $optgroup).PHP_EOL;
 				}
 				else
 				{
-					$opt_attr = array('value' => $key, 'style' => 'text-indent: '.(10*($level-1)).'px;');
-					(in_array((string)$key, $selected, true)) && $opt_attr[] = 'selected';
+					$opt_attr = array('value' => $key);
+					$level > 1 and $opt_attr['style'] = 'text-indent: '.(10*($level-1)).'px;';
+					(in_array((string) $key, $selected, true)) && $opt_attr[] = 'selected';
 					$input .= str_repeat("\t", $level);
 					$opt_attr['value'] = ($current_obj->get_config('prep_value', true) && empty($attributes['dont_prep'])) ?
 						$current_obj->prep_value($opt_attr['value']) : $opt_attr['value'];
@@ -574,15 +589,21 @@ class Form_Instance
 			$attributes['id'] = $this->get_config('auto_id_prefix', '').$attributes['name'];
 		}
 
+		// if it's a multiselect, make sure the name is an array
+		if (isset($attributes['multiple']) and substr($attributes['name'], -2) != '[]')
+		{
+			$attributes['name'] .= '[]';
+		}
+
 		return html_tag('select', $this->attr_to_string($attributes), $input);
 	}
 
 	/**
 	 * Create a label field
 	 *
-	 * @param   string|array  either fieldname or full attributes array (when array other params are ignored)
-	 * @param   string
-	 * @param   array
+	 * @param   string|array  $label       either fieldname or full attributes array (when array other params are ignored)
+	 * @param   string        $id
+	 * @param   array         $attributes
 	 * @return  string
 	 */
 	public function label($label, $id = null, array $attributes = array())
@@ -594,15 +615,21 @@ class Form_Instance
 			isset($attributes['id']) and $id = $attributes['id'];
 		}
 
-		if (empty($attributes['for']) and $this->get_config('auto_id', false) == true)
+		if (empty($attributes['for']) and ! empty($id))
 		{
-			$attributes['for'] = $this->get_config('auto_id_prefix', 'form_').$id;
+			if ($this->get_config('auto_id', false) == true)
+			{
+				$attributes['for'] = $this->get_config('auto_id_prefix', 'form_').$id;
+			}
+			else
+			{
+				$attributes['for'] = $id;
+			}
 		}
 
 		unset($attributes['label']);
-		unset($attributes['id']);
 
-		return html_tag('label', $attributes, \Lang::get($label) ?: $label);
+		return html_tag('label', $attributes, \Lang::get($label, array(), false) ?: $label);
 	}
 
 	/**
@@ -610,7 +637,7 @@ class Form_Instance
 	 *
 	 * Prepares the value for display in the form
 	 *
-	 * @param   string
+	 * @param   string  $value
 	 * @return  string
 	 */
 	public function prep_value($value)
@@ -649,9 +676,9 @@ class Form_Instance
 	/**
 	 * Build & template individual field
 	 *
-	 * @param   string|Fieldset_Field  field instance or name of a field in this form's fieldset
+	 * @param   string|Fieldset_Field  $field  field instance or name of a field in this form's fieldset
 	 * @return  string
-	 * @depricated until v1.2
+	 * @deprecated until v1.2
 	 */
 	public function build_field($field)
 	{
@@ -676,8 +703,8 @@ class Form_Instance
 	/**
 	 * Sets a config value on the fieldset
 	 *
-	 * @param   string
-	 * @param   mixed
+	 * @param   string  $config
+	 * @param   mixed   $value
 	 * @return  Fieldset  this, to allow chaining
 	 */
 	public function set_config($config, $value = null)
@@ -690,8 +717,8 @@ class Form_Instance
 	/**
 	 * Get a single or multiple config values by key
 	 *
-	 * @param   string|array  a single key or multiple in an array, empty to fetch all
-	 * @param   mixed         default output when config wasn't set
+	 * @param   string|array  $key      a single key or multiple in an array, empty to fetch all
+	 * @param   mixed         $default  default output when config wasn't set
 	 * @return  mixed|array   a single config value or multiple in an array when $key input was an array
 	 */
 	public function get_config($key = null, $default = null)
@@ -720,6 +747,9 @@ class Form_Instance
 
 	/**
 	 * Alias for $this->fieldset->build()
+	 *
+	 * @param mixed  $action
+	 * @return string
 	 */
 	public function build($action = null)
 	{
@@ -728,6 +758,12 @@ class Form_Instance
 
 	/**
 	 * Alias for $this->fieldset->add()
+	 *
+	 * @param   string
+	 * @param   string
+	 * @param   array
+	 * @param   array
+	 * @return  Fieldset_Field
 	 */
 	public function add($name, $label = '', array $attributes = array(), array $rules = array())
 	{
@@ -737,6 +773,9 @@ class Form_Instance
 	/**
 	 * Alias for $this->fieldset->add_model()
 	 *
+	 * @param	string|Object  $class     either a full classname (including full namespace) or object instance
+	 * @param	array|Object   $instance  array or object that has the exactly same named properties to populate the fields
+	 * @param	string         $method    method name to call on model for field fetching
 	 * @return	Validation	this, to allow chaining
 	 */
 	public function add_model($class, $instance = null, $method = 'set_form_fields')
@@ -748,6 +787,10 @@ class Form_Instance
 
 	/**
 	 * Alias for $this->fieldset->field()
+	 *
+	 * @param   string|null           $name     field name or null to fetch an array of all
+	 * @param   bool                  $flatten  whether to get the fields array or flattened array
+	 * @return  Fieldset_Field|false
 	 */
 	public function field($name = null, $flatten = false)
 	{
@@ -756,6 +799,10 @@ class Form_Instance
 
 	/**
 	 * Alias for $this->fieldset->populate() for this fieldset
+	 *
+	 * @param   array|object  $input
+	 * @param   bool          $repopulate
+	 * @return  Fieldset
 	 */
 	public function populate($input, $repopulate = false)
 	{
@@ -764,6 +811,8 @@ class Form_Instance
 
 	/**
 	 * Alias for $this->fieldset->repopulate() for this fieldset
+	 *
+	 * @return  Fieldset_Field
 	 */
 	public function repopulate()
 	{

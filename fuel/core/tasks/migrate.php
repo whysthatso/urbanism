@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Tasks;
@@ -45,6 +45,16 @@ class Migrate
 	protected static $package_count = 0;
 
 	/**
+	 * @var  bool  flag to indicate a rerun is needed
+	 */
+	protected static $rerun = false;
+
+	/**
+	 * @var  array  list of migrations executed
+	 */
+	protected static $executed = array();
+
+	/**
 	 * sets the properties by grabbing Cli options
 	 */
 	public function __construct()
@@ -57,12 +67,39 @@ class Migrate
 		$packages = \Cli::option('packages', \Cli::option('p'));
 		$default = \Cli::option('default');
 		$all = \Cli::option('all');
+		$installed = \Cli::option('installed');
+
+		if ($all and $installed)
+		{
+			\Cli::write('--all and --installed are mutually exclusive!', 'light_red');
+			exit;
+		}
 
 		if ($all)
 		{
+			$default = true;
 			$modules = true;
 			$packages = true;
+		}
+		elseif ($installed)
+		{
 			$default = true;
+
+			// fetch defined modules
+			$modules = explode(',', $modules);
+			foreach(\Config::get('always_load.modules', array()) as $module)
+			{
+				$modules[] = $module;
+			}
+			$modules = implode(',', array_unique($modules));
+
+			// fetch defined packages
+			$packages = explode(',', $packages);
+			foreach(\Config::get('always_load.packages', array()) as $name => $package)
+			{
+				$packages[] = is_numeric($name) ? $package : $name;
+			}
+			$packages = implode(',', array_unique($packages));
 		}
 
 		// if modules option set
@@ -75,11 +112,11 @@ class Migrate
 				foreach (\Config::get('module_paths') as $path)
 				{
 					// get all modules that have files in the migration folder
-					foreach (glob($path . '*/') as $m)
+					foreach(new \GlobIterator(realpath($path).DS.'*') as $m)
 					{
-						if (count(glob($m.\Config::get('migrations.folder').'/*.php')))
+						if (count(glob($m->getPathname().rtrim(DS.\Config::get('migrations.folder'), '\\/').DS.'*.php', GLOB_NOSORT)))
 						{
-							static::$modules[] = basename($m);
+							static::$modules[] = $m->getBasename();
 						}
 					}
 				}
@@ -98,13 +135,14 @@ class Migrate
 			if ($packages === true)
 			{
 				// get all packages that have files in the migration folder
-				foreach (\Config::get('package_paths', array(PKGPATH)) as $p)
+				foreach (\Config::get('package_paths', array(PKGPATH)) as $path)
 				{
-					foreach (glob($p . '*/') as $pp)
+					// get all modules that have files in the migration folder
+					foreach(new \GlobIterator(realpath($path).DS.'*') as $p)
 					{
-						if (count(glob($pp.\Config::get('migrations.folder').'/*.php')))
+						if (count(glob($p->getPathname().rtrim(DS.\Config::get('migrations.folder'), '\\/').DS.'*.php', GLOB_NOSORT)))
 						{
-							static::$packages[] = basename($pp);
+							static::$packages[] = $p->getBasename();
 						}
 					}
 				}
@@ -144,23 +182,63 @@ class Migrate
 			return static::help();
 		}
 
-		// run app (default) migrations if default is true
-		if (static::$default)
+		do
 		{
-			static::$name('default', 'app');
-		}
+			// reset the rerun flag
+			static::$rerun = false;
 
-		// run migrations on all specified modules
-		foreach (static::$modules as $module)
-		{
-			static::$name($module, 'module');
-		}
+			// store and reset the current execution state
+			$state = static::$executed;
+			static::$executed = array();
 
-		// run migrations on all specified packages
-		foreach (static::$packages as $package)
-		{
-			static::$name($package, 'package');
+			// run app (default) migrations if default is true
+			if (static::$default)
+			{
+				static::$name('default', 'app');
+			}
+
+			// run migrations on all specified modules
+			foreach (static::$modules as $module)
+			{
+				// check if the module exists
+				if ( ! \Module::exists($module))
+				{
+					\Cli::write('Requested module "'.$module.'" does not exist!', 'light_red');
+				}
+				else
+				{
+					// run the migration
+					static::$name($module, 'module');
+				}
+			}
+
+			// run migrations on all specified packages
+			foreach (static::$packages as $package)
+			{
+				// check if the module exists
+				if ( ! \Package::exists($package))
+				{
+					\Cli::write('Requested package "'.$package.'" does not exist!', 'light_red');
+				}
+				else
+				{
+					static::$name($package, 'package');
+				}
+			}
+
+			// do we need to re-run?
+			if (static::$rerun)
+			{
+				// check for any progress on this run
+				if ($state == static::$executed)
+				{
+					// there wasn't any, bail out
+					static::$rerun = false;
+					\Cli::write('Migration loop detected! Check if there is a dependency that can\'t be fulfilled by the current selection!', 'light_red');
+				}
+			}
 		}
+		while (static::$rerun);
 	}
 
 	/**
@@ -191,31 +269,22 @@ class Migrate
 		elseif ($version !== '')
 		{
 			// if version has a value, make sure only 1 item was passed
-			if (static::$default + static::$module_count + static::$package_count > 1)
+			if ((int) static::$default + static::$module_count + static::$package_count > 1)
 			{
-				\Cli::write('Migration: version only excepts 1 item.');
+				\Cli::write('Migration: version only accepts 1 item.');
 				return;
 			}
-			$migrations = \Migrate::version($version, $name, $type);
+			$migrations = \Migrate::version($version, $name, $type, \Cli::option('catchup', false));
 		}
 
 		// migrate to the latest version
 		else
 		{
-			$migrations = \Migrate::latest($name, $type);
+			$migrations = \Migrate::latest($name, $type, \Cli::option('catchup', false));
 		}
 
-		// any migrations executed?
-		if ($migrations)
-		{
-			\Cli::write('Performed migrations for '.$type.':'.$name.':', 'green');
-
-			foreach ($migrations as $migration)
-			{
-				\Cli::write($migration);
-			}
-		}
-		else
+		// were there any migrations at all?
+		if (empty($migrations))
 		{
 			if ($version !== '')
 			{
@@ -225,6 +294,33 @@ class Migrate
 			{
 				\Cli::write('Already on the latest migration for '.$type.':'.$name.'.');
 			}
+		}
+
+		// did we run all migrations?
+		elseif ($last = end($migrations))
+		{
+			\Cli::write('Performed migrations for '.$type.':'.$name.':', 'green');
+
+			foreach ($migrations as $migration)
+			{
+				\Cli::write($migration);
+			}
+
+			// flush all cache after running the migrations if needed
+			if (\Config::get('migrations.flush_cache', false))
+			{
+				\Cache::delete_all();
+			}
+		}
+		else
+		{
+			\Cli::write('Some migrations for '.$type.':'.$name.' are postponed due to dependencies.', 'cyan');
+
+			// store the ones we've executed
+			static::$executed[$type.'-'.$name] = $migrations;
+
+			// set the rerun flag
+			static::$rerun = true;
 		}
 	}
 
@@ -271,9 +367,9 @@ class Migrate
 		$version = \Cli::option('v', \Cli::option('version', null));
 
 		// if version has a value, make sure only 1 item was passed
-		if ($version and (static::$default + static::$module_count + static::$package_count > 1))
+		if ($version and ((int) static::$default + static::$module_count + static::$package_count > 1))
 		{
-			\Cli::write('Migration: version only excepts 1 item.');
+			\Cli::write('Migration: version only accepts 1 item.');
 			return;
 		}
 
@@ -306,9 +402,9 @@ class Migrate
 		$version = \Cli::option('v', \Cli::option('version', null));
 
 		// if version has a value, make sure only 1 item was passed
-		if ($version and (static::$default + static::$module_count + static::$package_count > 1))
+		if ($version and ((int) static::$default + static::$module_count + static::$package_count > 1))
 		{
-			\Cli::write('Migration: version only excepts 1 item.');
+			\Cli::write('Migration: version only accepts 1 item.');
 			return;
 		}
 
@@ -339,22 +435,26 @@ Usage:
     php oil refine migrate[:command] [--version=X]
 
 Fuel commands:
-    help    shows this text
-    current migrates to the version defined in the migration configuration file
-    up      migrate up to the next version
-    down    migrate down to the previous version
-    run     run all migrations (default)
+    help     shows this text
+    current  migrates to the version defined in the migration configuration file
+    up       migrate up to the next version
+    down     migrate down to the previous version
+    run      run all migrations (default)
 
 Fuel options:
     -v, [--version]  # Migrate to a specific version ( only 1 item at a time)
+                     # If no version is given, it lists all installed migrations
+    --catchup        # Use if you have out-of-sequence migrations that can be safely run
+    --installed      # shortcut for --modules=<list> --packages=<list> --default, it will use
+                       your applications' "always_load" configuration to determine what to migrate
+    --all            # shortcut for --modules --packages --default
 
     # The following disable default migrations unless you add --default to the command
-    --default   # re-enables default migration
-    --modules -m   # Migrates all modules
-    --modules=item1,item2 -m=item1,item2   # Migrates specific modules
-    --packages -p   # Migrates all packages
+    --default                               # re-enables default migration
+    --modules -m                            # Migrates all modules
+    --modules=item1,item2 -m=item1,item2    # Migrates specific modules
+    --packages -p                           # Migrates all packages
     --packages=item1,item2 -p=item1,item2   # Migrates specific modules
-    --all   # shortcut for --modules --packages --default
 
 Description:
     The migrate task can run migrations. You can go up, down or by default go to the current migration marked in the config file.
@@ -367,8 +467,11 @@ Examples:
     php oil r migrate --version=201203171206
     php oil r migrate --modules --packages --default
     php oil r migrate:up --modules=module1,module2 --packages=package1
-    php oil r migrate --module=module1 -v=3
+    php oil r migrate --modules=module1 -v=3
     php oil r migrate --all
+    php oil r migrate --installed
+    php oil r migrate --installed --modules=extramodule --packages=extrapackage
+    php oil r migrate --all -v
 
 HELP;
 

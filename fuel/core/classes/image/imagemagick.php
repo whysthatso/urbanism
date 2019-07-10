@@ -1,47 +1,44 @@
 <?php
-
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
- * Image manipulation class.
- *
- * @package		Fuel
- * @version		1.0
- * @license		MIT License
- * @copyright	2010 - 2011 Fuel Development Team
- * @link		http://fuelphp.com
+ * @package    Fuel
+ * @version    1.8.2
+ * @author     Fuel Development Team
+ * @license    MIT License
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
 
 class Image_Imagemagick extends \Image_Driver
 {
-
 	protected $image_temp = null;
 	protected $accepted_extensions = array('png', 'gif', 'jpg', 'jpeg');
-	protected $size_cache = null;
+	protected $sizes_cache = null;
 	protected $im_path = null;
 
-	public function load($filename, $return_data = false)
+	public function load($filename, $return_data = false, $force_extension = false)
 	{
-		extract(parent::load($filename));
+		extract(parent::load($filename, $return_data, $force_extension));
 
 		$this->clear_sizes();
 		if (empty($this->image_temp))
 		{
 			do
 			{
-				$this->image_temp = $this->config['temp_dir'].substr($this->config['temp_append'].md5(time() * microtime()), 0, 32).'.png';
+				$this->image_temp = $this->config['temp_dir'].substr($this->config['temp_append'].\Str::random('unique'), 0, 32).'.png';
 			}
-			while (file_exists($this->image_temp));
+			while (is_file($this->image_temp));
 		}
-		elseif (file_exists($this->image_temp))
+		elseif (is_file($this->image_temp))
 		{
 			$this->debug('Removing previous temporary image.');
 			unlink($this->image_temp);
 		}
 		$this->debug('Temp file: '.$this->image_temp);
-		if (!file_exists($this->config['temp_dir']) || !is_dir($this->config['temp_dir']))
+		if ( ! is_dir($this->config['temp_dir']))
 		{
 			throw new \RuntimeException("The temp directory that was given does not exist.");
 		}
@@ -49,7 +46,7 @@ class Image_Imagemagick extends \Image_Driver
 		{
 			throw new \RuntimeException("Could not write in the temp directory.");
 		}
-		$this->exec('convert', '"'.$image_fullpath.'"[0] "'.$this->image_temp.'"');
+		$this->exec('convert', "-auto-orient '".$image_fullpath."'[0] '".$this->image_temp."'");
 
 		return $this;
 	}
@@ -57,8 +54,8 @@ class Image_Imagemagick extends \Image_Driver
 	protected function _crop($x1, $y1, $x2, $y2)
 	{
 		extract(parent::_crop($x1, $y1, $x2, $y2));
-		$image = '"'.$this->image_temp.'"';
-		$this->exec('convert', $image.' -crop '.($x2 - $x1).'x'.($y2 - $y1).'+'.$x1.'+'.$y1.' +repage '.$image);
+		$image = "'".$this->image_temp."'";
+		$this->exec('convert', $image.' -auto-orient -crop '.($x2 - $x1).'x'.($y2 - $y1).'+'.$x1.'+'.$y1.' +repage '.$image);
 		$this->clear_sizes();
 	}
 
@@ -66,8 +63,8 @@ class Image_Imagemagick extends \Image_Driver
 	{
 		extract(parent::_resize($width, $height, $keepar, $pad));
 
-		$image = '"'.$this->image_temp.'"';
-		$this->exec('convert', "-define png:size=".$cwidth."x".$cheight." ".$image." ".
+		$image = "'".$this->image_temp."'";
+		$this->exec('convert', "-auto-orient -define png:size=".$cwidth."x".$cheight." ".$image." ".
 			"-background none ".
 			"-resize \"".($pad ? $width : $cwidth)."x".($pad ? $height : $cheight)."!\" ".
 			"-gravity center ".
@@ -79,13 +76,35 @@ class Image_Imagemagick extends \Image_Driver
 	{
 		extract(parent::_rotate($degrees));
 
-		$image = '"'.$this->image_temp.'"';
-		$this->exec('convert', $image." -background none -virtual-pixel background +distort ScaleRotateTranslate ".$degrees." +repage ".$image);
+		$image = "'".$this->image_temp."'";
+		$this->exec('convert', $image." -background none -auto-orient -virtual-pixel background +distort ScaleRotateTranslate ".$degrees." +repage ".$image);
 
 		$this->clear_sizes();
 	}
 
-	protected function _watermark($filename, $position, $padding = 5)
+	protected function _flip($direction)
+	{
+		switch ($direction)
+		{
+			case 'vertical':
+			$arg = '-flip';
+			break;
+
+			case 'horizontal':
+			$arg = '-flop';
+			break;
+
+			case 'both':
+			$arg = '-flip -flop';
+			break;
+
+			default: return false;
+		}
+		$image = "'".$this->image_temp."'";
+		$this->exec('convert', $image.' -auto-orient '.$arg.' '.$image);
+	}
+
+	protected function _watermark($filename, $position, $padding = array(5,5))
 	{
 		$values = parent::_watermark($filename, $position, $padding);
 		if ($values == false)
@@ -97,6 +116,7 @@ class Image_Imagemagick extends \Image_Driver
 		$x >= 0 and $x = '+'.$x;
 		$y >= 0 and $y = '+'.$y;
 
+		$image = "'".$this->image_temp."'";
 		$this->exec(
 			'composite',
 			'-compose atop -geometry '.$x.$y.' '.
@@ -109,9 +129,9 @@ class Image_Imagemagick extends \Image_Driver
 	{
 		extract(parent::_border($size, $color));
 
-		$image = '"'.$this->image_temp.'"';
+		$image = "'".$this->image_temp."'";
 		$color = $this->create_color($color, 100);
-		$command = $image.' -compose copy -bordercolor '.$color.' -border '.$size.'x'.$size.' '.$image;
+		$command = $image.' -auto-orient -compose copy -bordercolor '.$color.' -border '.$size.'x'.$size.' '.$image;
 		$this->exec('convert', $command);
 
 		$this->clear_sizes();
@@ -121,9 +141,9 @@ class Image_Imagemagick extends \Image_Driver
 	{
 		extract(parent::_mask($maskimage));
 
-		$mimage = '"'.$maskimage.'"';
-		$image = '"'.$this->image_temp.'"';
-		$command = $image.' '.$mimage.' +matte  -compose copy-opacity -composite '.$image;
+		$mimage = "'".$maskimage."'";
+		$image = "'".$this->image_temp."'";
+		$command = $image.' '.$mimage.' +matte -auto-orient -compose copy-opacity -composite '.$image;
 		$this->exec('convert', $command);
 	}
 
@@ -138,21 +158,21 @@ class Image_Imagemagick extends \Image_Driver
 	{
 		extract(parent::_rounded($radius, $sides, null));
 
-		$image = '"'.$this->image_temp.'"';
+		$image = "'".$this->image_temp."'";
 		$r = $radius;
-		$command = $image." ( +clone -alpha extract ".
+		$command = $image." \\( +clone -alpha extract ".
 			( ! $tr ? '' : "-draw \"fill black polygon 0,0 0,$r $r,0 fill white circle $r,$r $r,0\" ")."-flip ".
 			( ! $br ? '' : "-draw \"fill black polygon 0,0 0,$r $r,0 fill white circle $r,$r $r,0\" ")."-flop ".
 			( ! $bl ? '' : "-draw \"fill black polygon 0,0 0,$r $r,0 fill white circle $r,$r $r,0\" ")."-flip ".
 			( ! $tl ? '' : "-draw \"fill black polygon 0,0 0,$r $r,0 fill white circle $r,$r $r,0\" ").
-			') -alpha off -compose CopyOpacity -composite '.$image;
+			'\\) -alpha off -auto-orient -compose CopyOpacity -composite '.$image;
 		$this->exec('convert', $command);
 	}
 
 	protected function _grayscale()
 	{
-		$image = '"'.$this->image_temp.'"';
-		$this->exec('convert', $image." -colorspace Gray ".$image);
+		$image = "'".$this->image_temp."'";
+		$this->exec('convert', $image." -auto-orient -colorspace Gray ".$image);
 	}
 
 	public function sizes($filename = null, $usecache = true)
@@ -160,7 +180,7 @@ class Image_Imagemagick extends \Image_Driver
 		$is_loaded_file = $filename == null;
 		if ( ! $is_loaded_file or $this->sizes_cache == null or !$usecache)
 		{
-			$reason = ($filename != null ? "filename" : ($this->size_cache == null ? 'cache' : 'option'));
+			$reason = ($filename != null ? "filename" : ($this->sizes_cache == null ? 'cache' : 'option'));
 			$this->debug("Generating size of image... (triggered by $reason)");
 
 			if ($is_loaded_file and ! empty($this->image_temp))
@@ -168,11 +188,11 @@ class Image_Imagemagick extends \Image_Driver
 				$filename = $this->image_temp;
 			}
 
-			$output = $this->exec('identify', '-format "%[fx:w] %[fx:h]" "'.$filename.'"[0]');
+			$output = $this->exec('identify', "-format '%w %h' '".$filename."'[0]");
 			list($width, $height) = explode(" ", $output[0]);
 			$return = (object) array(
 				'width' => $width,
-				'height' => $height
+				'height' => $height,
 			);
 
 			if ($is_loaded_file)
@@ -189,7 +209,7 @@ class Image_Imagemagick extends \Image_Driver
 		return $return;
 	}
 
-	public function save($filename, $permissions = null)
+	public function save($filename = null, $permissions = null)
 	{
 		extract(parent::save($filename, $permissions));
 
@@ -197,13 +217,13 @@ class Image_Imagemagick extends \Image_Driver
 		$this->add_background();
 
 		$filetype = $this->image_extension;
-		$old = '"'.$this->image_temp.'"';
-		$new = '"'.$filename.'"';
+		$old = "'".$this->image_temp."'";
+		$new = "'".$filename."'";
 
 		if(($filetype == 'jpeg' or $filetype == 'jpg') and $this->config['quality'] != 100)
 		{
-			$quality = '"'.$this->config['quality'].'%"';
-			$this->exec('convert', $old.' -quality '.$quality.' '.$new);
+			$quality = "'".$this->config['quality']."%'";
+			$this->exec('convert', $old.' -auto-orient -quality '.$quality.' '.$new);
 		}
 		else
 		{
@@ -225,18 +245,18 @@ class Image_Imagemagick extends \Image_Driver
 		$this->run_queue();
 		$this->add_background();
 
-		$image = '"'.$this->image_temp.'"';
+		$image = "'".$this->image_temp."'";
 
 		if(($filetype == 'jpeg' or $filetype == 'jpg') and $this->config['quality'] != 100)
 		{
-			$quality = '"'.$this->config['quality'].'%"';
-			$this->exec('convert', $image.' -quality '.$quality.' '.strtolower($filetype).':-', true);
+			$quality = "'".$this->config['quality']."%'";
+			$this->exec('convert', $image.' -auto-orient -quality '.$quality.' '.strtolower($filetype).':-', true);
 		}
 		elseif (substr($this->image_temp, -1 * strlen($filetype)) != $filetype)
 		{
 			if ( ! $this->config['debug'])
 			{
-				$this->exec('convert', $image.' '.strtolower($filetype).':-', true);
+				$this->exec('convert', $image.' -auto-orient '.strtolower($filetype).':-', true);
 			}
 		}
 		else
@@ -268,10 +288,10 @@ class Image_Imagemagick extends \Image_Driver
 		if ($this->config['bgcolor'] != null)
 		{
 			$bgcolor = $this->config['bgcolor'] == null ? '#000' : $this->config['bgcolor'];
-			$image   = '"'.$this->image_temp.'"';
+			$image   = "'".$this->image_temp."'";
 			$color   = $this->create_color($bgcolor, 100);
 			$sizes   = $this->sizes();
-			$command = '-size '.$sizes->width.'x'.$sizes->height.' '.'canvas:'.$color.' '.
+			$command = '-auto-orient -size '.$sizes->width.'x'.$sizes->height.' '.'canvas:'.$color.' '.
 				$image.' -composite '.$image;
 			$this->exec('convert', $command);
 		}
@@ -285,7 +305,7 @@ class Image_Imagemagick extends \Image_Driver
 	 * @param   boolean  $passthru  Returns the output if false or pass it to browser.
 	 * @return  mixed    Either returns the output or returns nothing.
 	 */
-	private function exec($program, $params, $passthru = false)
+	protected function exec($program, $params, $passthru = false)
 	{
 		//  Determine the path
 		$this->im_path = realpath($this->config['imagemagick_dir'].$program);
@@ -295,7 +315,7 @@ class Image_Imagemagick extends \Image_Driver
 		}
 		if ( ! $this->im_path)
 		{
-			throw new \RuntimeException("imagemagick executables not found in ".$this->config['imagemagick_dir']);
+			throw new \RuntimeException("Imagemagick executables not found in ".$this->config['imagemagick_dir']);
 		}
 
 		$command = $this->im_path." ".$params;
@@ -307,7 +327,7 @@ class Image_Imagemagick extends \Image_Driver
 
 		if ($code != 0)
 		{
-			throw new \FuelException("imagemagick failed to edit the image. Returned with $code.<br /><br />Command:\n <code>$command</code>");
+			throw new \FuelException("Imagemagick failed to manipulate the image. Return code = $code. Command: $command");
 		}
 
 		return $output;
@@ -328,10 +348,9 @@ class Image_Imagemagick extends \Image_Driver
 
 	public function __destruct()
 	{
-		if (file_exists($this->image_temp))
+		if (is_file($this->image_temp))
 		{
 			unlink($this->image_temp);
 		}
 	}
 }
-

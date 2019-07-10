@@ -53,7 +53,10 @@ class PhpQuickProfiler {
 
 	public function gatherPathData()
 	{
-		$this->output['paths'] = \Finder::instance()->paths();
+		foreach (\Finder::instance()->paths() as $path)
+		{
+			$this->output['paths'][] = \Fuel::clean_path($path);
+		}
 		$this->output['pathTotals'] = array(
 			'count' => count($this->output['paths']),
 		);
@@ -75,7 +78,7 @@ class PhpQuickProfiler {
 		foreach($files as $key => $file) {
 			$size = filesize($file);
 			$fileList[] = array(
-					'name' => $file,
+					'name' => \Fuel::clean_path($file),
 					'size' => $this->getReadableFileSize($size)
 				);
 			$fileTotals['size'] += $size;
@@ -145,13 +148,13 @@ class PhpQuickProfiler {
 			$rs = false;
 			try {
 				$sql = 'EXPLAIN '.html_entity_decode($query['sql'], ENT_QUOTES);
-				$rs = \DB::query($sql, \DB::SELECT)->execute();
+				$rs = \DB::query($sql, \DB::SELECT)->execute($query['dbname'])->as_array();
 			}
 			catch(Exception $e)
 			{}
 
 			if($rs) {
-				$query['explain'] = $rs[0];
+				$query['explain'] = $rs;
 			}
 		}
 		return $query;
@@ -214,7 +217,8 @@ class PhpQuickProfiler {
 	     DISPLAY TO THE SCREEN -- CALL WHEN CODE TERMINATING
 	-----------------------------------------------------------*/
 
-	public function display($db = '') {
+	public function display($db = '', $return = false)
+	{
 		$this->db = $db;
 		$this->gatherConsoleData();
 		$this->gatherPathData();
@@ -222,8 +226,17 @@ class PhpQuickProfiler {
 		$this->gatherMemoryData();
 		$this->gatherQueryData();
 		$this->gatherSpeedData();
+
+		if ($return)
+		{
+			return $this->output;
+		}
+
 		require_once('display.php');
-		return displayPqp($this->output);
+		if (function_exists('displayPqp'))
+		{
+			return displayPqp($this->output);
+		}
 	}
 
 }

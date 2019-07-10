@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -22,12 +22,17 @@ namespace Fuel\Core;
  */
 class Inflector
 {
-
+	/**
+	 * @var  array  default list of uncountable words, in English
+	 */
 	protected static $uncountable_words = array(
 		'equipment', 'information', 'rice', 'money',
-		'species', 'series', 'fish', 'meta'
+		'species', 'series', 'fish', 'meta',
 	);
 
+	/**
+	 * @var  array  default list of iregular plural words, in English
+	 */
 	protected static $plural_rules = array(
 		'/^(ox)$/i'                 => '\1\2en',     // ox
 		'/([m|l])ouse$/i'           => '\1ice',      // mouse, louse
@@ -50,6 +55,9 @@ class Inflector
 		'/$/'                      => 's',
 	);
 
+	/**
+	 * @var  array  default list of iregular singular words, in English
+	 */
 	protected static $singular_rules = array(
 		'/(matr)ices$/i'         => '\1ix',
 		'/(vert|ind)ices$/i'     => '\1ex',
@@ -80,11 +88,40 @@ class Inflector
 		'/([^us])s$/i'           => '\1',
 	);
 
+	/**
+	 * Load any localized rules on first load
+	 */
+	public static function _init()
+	{
+		static::load_rules();
+	}
+
+	/**
+	 * Load any localized rulesets based on the current language configuration
+	 * If not exists, the current rules remain active
+	 */
+	public static function load_rules()
+	{
+		\Lang::load('inflector', true, false, true);
+
+		if ($rules = \Lang::get('inflector.uncountable_words', array()))
+		{
+			static::$uncountable_words = $rules;
+		}
+		if ($rules = \Lang::get('inflector.singular_rules', array()))
+		{
+			static::$singular_rules = $rules;
+		}
+		if ($rules = \Lang::get('inflector.plural_rules', array()))
+		{
+			static::$plural_rules = $rules;
+		}
+  	}
 
 	/**
 	 * Add order suffix to numbers ex. 1st 2nd 3rd 4th 5th
 	 *
-	 * @param   int     the number to ordinalize
+	 * @param   int     $number the number to ordinalize
 	 * @return  string  the ordinalized version of $number
 	 * @link    http://snipplr.com/view/4627/a-function-to-add-a-prefix-to-numbers-ex-1st-2nd-3rd-4th-5th/
 	 */
@@ -122,12 +159,20 @@ class Inflector
 	/**
 	 * Gets the plural version of the given word
 	 *
-	 * @param   string  the word to pluralize
+	 * @param   string  $word   the word to pluralize
+	 * @param   int     $count  number of instances
 	 * @return  string  the plural version of $word
 	 */
-	public static function pluralize($word)
+	public static function pluralize($word, $count = 0)
 	{
 		$result = strval($word);
+
+		// If a counter is provided, and that equals 1
+		// return as singular.
+		if ($count === 1)
+		{
+			return $result;
+		}
 
 		if ( ! static::is_countable($result))
 		{
@@ -149,7 +194,7 @@ class Inflector
 	/**
 	 * Gets the singular version of the given word
 	 *
-	 * @param   string  the word to singularize
+	 * @param   string  $word  the word to singularize
 	 * @return  string  the singular version of $word
 	 */
 	public static function singularize($word)
@@ -174,21 +219,28 @@ class Inflector
 	}
 
 	/**
-	 * Takes a string that has words seperated by underscores and turns it into
+	 * Takes a string that has words separated by underscores and turns it into
 	 * a CamelCased string.
 	 *
-	 * @param   string  the underscored word
+	 * @param   string  $underscored_word  the underscored word
 	 * @return  string  the CamelCased version of $underscored_word
 	 */
 	public static function camelize($underscored_word)
 	{
-		return preg_replace('/(^|_)(.)/e', "strtoupper('\\2')", strval($underscored_word));
+		return preg_replace_callback(
+			'/(^|_)(.)/',
+			function ($parm)
+			{
+				return strtoupper($parm[2]);
+			},
+			strval($underscored_word)
+		);
 	}
 
 	/**
 	 * Takes a CamelCased string and returns an underscore separated version.
 	 *
-	 * @param   string  the CamelCased word
+	 * @param   string  $camel_cased_word  the CamelCased word
 	 * @return  string  an underscore separated version of $camel_cased_word
 	 */
 	public static function underscore($camel_cased_word)
@@ -200,10 +252,11 @@ class Inflector
 	 * Translate string to 7-bit ASCII
 	 * Only works with UTF-8.
 	 *
-	 * @param   string
-	 * @return  string
+	 * @param   string  $str              string to translate
+	 * @param   bool    $allow_non_ascii  whether to remove non ascii
+	 * @return  string                    translated string
 	 */
-	public static function ascii($str)
+	public static function ascii($str, $allow_non_ascii = false)
 	{
 		// Translate unicode characters to their simpler counterparts
 		\Config::load('ascii', true);
@@ -211,40 +264,59 @@ class Inflector
 
 		$str = preg_replace(array_keys($foreign_characters), array_values($foreign_characters), $str);
 
-		// remove any left over non 7bit ASCII
-		return preg_replace('/[^\x09\x0A\x0D\x20-\x7E]/', '', $str);
+		if ( ! $allow_non_ascii)
+		{
+			return preg_replace('/[^\x09\x0A\x0D\x20-\x7E]/', '', $str);
+		}
+
+		return $str;
 	}
 
 	/**
 	 * Converts your text to a URL-friendly title so it can be used in the URL.
 	 * Only works with UTF8 input and and only outputs 7 bit ASCII characters.
 	 *
-	 * @param   string  the text
-	 * @param   string  the separator (either - or _)
-	 * @return  string  the new title
+	 * @param   string  $str              the text
+	 * @param   string  $sep              the separator
+	 * @param   bool    $lowercase        whether to convert to lowercase
+	 * @param   bool    $allow_non_ascii  whether to allow non ascii
+	 * @return  string                    the new title
 	 */
-	public static function friendly_title($str, $sep = '-', $lowercase = false)
+	public static function friendly_title($str, $sep = '-', $lowercase = false, $allow_non_ascii = false)
 	{
-		// Allow underscore, otherwise default to dash
-		$sep = $sep === '_' ? '_' : '-';
-
 		// Remove tags
 		$str = \Security::strip_tags($str);
 
 		// Decode all entities to their simpler forms
 		$str = html_entity_decode($str, ENT_QUOTES, 'UTF-8');
 
-		// Remove all quotes.
+		// Only allow 7bit characters
+		$str = static::ascii($str, $allow_non_ascii);
+
+		if ($allow_non_ascii)
+		{
+			// Strip regular special chars
+			$str = preg_replace("#[\.;:\]\}\[\{\+\)\(\*&\^\$\#@\!±`%~']#iu", '', $str);
+		}
+		else
+		{
+			// Strip unwanted characters
+			$str = preg_replace("#[^a-z0-9]#i", $sep, $str);
+		}
+
+		// Remove all quotes
 		$str = preg_replace("#[\"\']#", '', $str);
 
-		// Only allow 7bit characters
-		$str = static::ascii($str);
+		// Replace apostrophes by separators
+		$str = preg_replace("#[\’]#", '-', $str);
 
-		// Strip unwanted characters
-		$str = preg_replace("#[^a-z0-9]#i", $sep, $str);
-		$str = preg_replace("#[/_|+ -]+#", $sep, $str);
+		// Replace repeating characters
+		$str = preg_replace("#[/_|+ -]+#u", $sep, $str);
+
+		// Remove separators from both ends
 		$str = trim($str, $sep);
 
+		// And convert to lowercase if needed
 		if ($lowercase === true)
 		{
 			$str = \Str::lower($str);
@@ -256,9 +328,9 @@ class Inflector
 	/**
 	 * Turns an underscore or dash separated word and turns it into a human looking string.
 	 *
-	 * @param   string  the word
-	 * @param   string  the separator (either _ or -)
-	 * @param   bool    lowercare string and upper case first
+	 * @param   string  $str        the word
+	 * @param   string  $sep        the separator (either _ or -)
+	 * @param   bool    $lowercase  lowercase string and upper case first
 	 * @return  string  the human version of given string
 	 */
 	public static function humanize($str, $sep = '_', $lowercase = true)
@@ -277,7 +349,7 @@ class Inflector
 	/**
 	 * Takes the class name out of a modulized string.
 	 *
-	 * @param   string  the modulized class
+	 * @param   string  $class_name_in_module  the modulized class
 	 * @return  string  the string without the class name
 	 */
 	public static function demodulize($class_name_in_module)
@@ -288,7 +360,7 @@ class Inflector
 	/**
 	 * Takes the namespace off the given class name.
 	 *
-	 * @param   string  the class name
+	 * @param   string  $class_name  the class name
 	 * @return  string  the string without the namespace
 	 */
 	public static function denamespace($class_name)
@@ -321,7 +393,7 @@ class Inflector
 	 * Takes a class name and determines the table name.  The table name is a
 	 * pluralized version of the class name.
 	 *
-	 * @param   string  the table name
+	 * @param   string  $class_name  the table name
 	 * @return  string  the table name
 	 */
 	public static function tableize($class_name)
@@ -337,8 +409,8 @@ class Inflector
 	/**
 	 * Takes an underscored classname and uppercases all letters after the underscores.
 	 *
-	 * @param   string  classname
-	 * @param   string  separator
+	 * @param   string  $class  classname
+	 * @param   string  $sep    separator
 	 * @return  string
 	 */
 	public static function words_to_upper($class, $sep = '_')
@@ -349,8 +421,8 @@ class Inflector
 	/**
 	 * Takes a table name and creates the class name.
 	 *
-	 * @param   string  the table name
-	 * @param   bool    whether to singularize the table name or not
+	 * @param   string  $name            the table name
+	 * @param   bool    $force_singular  whether to singularize the table name or not
 	 * @return  string  the class name
 	 */
 	public static function classify($name, $force_singular = true)
@@ -362,8 +434,8 @@ class Inflector
 	/**
 	 * Gets the foreign key for a given class.
 	 *
-	 * @param   string  the class name
-	 * @param   bool    $use_underscore	whether to use an underscore or not
+	 * @param   string  $class_name      the class name
+	 * @param   bool    $use_underscore	 whether to use an underscore or not
 	 * @return  string  the foreign key
 	 */
 	public static function foreign_key($class_name, $use_underscore = true)
@@ -379,7 +451,7 @@ class Inflector
 	/**
 	 * Checks if the given word has a plural version.
 	 *
-	 * @param   string  the word to check
+	 * @param   string  $word  the word to check
 	 * @return  bool    if the word is countable
 	 */
 	public static function is_countable($word)
@@ -387,4 +459,3 @@ class Inflector
 		return ! (\in_array(\Str::lower(\strval($word)), static::$uncountable_words));
 	}
 }
-

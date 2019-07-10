@@ -1,24 +1,28 @@
 <?php
 /**
- * Fuel is a fast, lightweight, community driven PHP5 framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2011 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Auth;
 
 abstract class Auth_Login_Driver extends \Auth_Driver
 {
-
 	/**
-	 * @var  Auth_Driver
+	 * @var  Auth_Driver	default instance
 	 */
 	protected static $_instance = null;
+
+	/**
+	 * @var  Session_Cookie  session object for the remember-me feature
+	 */
+	protected static $remember_me = null;
 
 	/**
 	 * @var  array  contains references if multiple were loaded
@@ -30,7 +34,7 @@ abstract class Auth_Login_Driver extends \Auth_Driver
 		// default driver id to driver name when not given
 		! array_key_exists('id', $config) && $config['id'] = $config['driver'];
 
-		$class = \Inflector::get_namespace($config['driver']).'Auth_Login_'.ucfirst(\Inflector::denamespace($config['driver']));
+		$class = \Inflector::get_namespace($config['driver']).'Auth_Login_'.\Str::ucwords(\Inflector::denamespace($config['driver']));
 		$driver = new $class($config);
 		static::$_instances[$driver->get_id()] = $driver;
 		is_null(static::$_instance) and static::$_instance = $driver;
@@ -42,7 +46,7 @@ abstract class Auth_Login_Driver extends \Auth_Driver
 				$custom = is_int($d)
 					? array('driver' => $custom)
 					: array_merge($custom, array('driver' => $d));
-				$class = 'Auth_'.ucfirst($type).'_Driver';
+				$class = 'Auth_'.\Str::ucwords($type).'_Driver';
 				$class::forge($custom);
 			}
 		}
@@ -56,11 +60,6 @@ abstract class Auth_Login_Driver extends \Auth_Driver
 	 * @var  array  config values
 	 */
 	protected $config = array();
-
-	/**
-	 * @var  object  PHPSecLib hash object
-	 */
-	private $hasher = null;
 
 	/**
 	 * Check for login
@@ -172,19 +171,90 @@ abstract class Auth_Login_Driver extends \Auth_Driver
 	 */
 	public function hash_password($password)
 	{
-		return base64_encode($this->hasher()->pbkdf2($password, \Config::get('auth.salt'), 10000, 32));
+		return base64_encode(hash_pbkdf2('sha256', $password, \Config::get('auth.salt'), \Config::get('auth.iterations', 10000), 32, true));
 	}
 
 	/**
-	 * Returns the hash object and creates it if necessary
+	 * Returns the list of defined groups
 	 *
-	 * @return  PHPSecLib\Crypt_Hash
+	 * @return  array
 	 */
-	public function hasher()
+	public function groups($driver = null)
 	{
-		is_null($this->hasher) and $this->hasher = new \PHPSecLib\Crypt_Hash();
+		$result = array();
 
-		return $this->hasher;
+		if ($driver === null)
+		{
+			foreach (\Auth::group(true) as $group)
+			{
+				method_exists($group, 'groups') and $result = \Arr::merge($result, $group->groups());
+			}
+		}
+		else
+		{
+			$result = \Auth::group($driver)->groups();
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Returns the list of defined roles
+	 *
+	 * @return  array
+	 */
+	public function roles($driver = null)
+	{
+		$result = array();
+
+		if ($driver === null)
+		{
+			foreach (\Auth::acl(true) as $acl)
+			{
+				method_exists($acl, 'roles') and $result = \Arr::merge($result, $acl->roles());
+			}
+		}
+		else
+		{
+			$result = \Auth::acl($driver)->roles();
+		}
+
+		return $result;
+	}
+
+	// ------------------------------------------------------------------------
+
+	/**
+	 * Set a remember-me cookie for the passed user id, or for the current
+	 * logged-in user if no id was given
+	 *
+	 * @return  bool  whether or not the cookie was set
+	 */
+	public function remember_me($user_id = null)
+	{
+		// if no user-id is given, get the current user's id
+		if ($user_id === null and isset($this->user['id']))
+		{
+			$user_id = $this->user['id'];
+		}
+
+		// if we have a session and an id, set it
+		if (static::$remember_me and $user_id)
+		{
+			static::$remember_me->set('user_id', $user_id);
+			return true;
+		}
+
+		// remember-me not enabled, or no user id available
+		return false;
+	}
+
+	/**
+	 * Remove any remember-me cookie stored
+	 */
+	public function dont_remember_me()
+	{
+		static::$remember_me and static::$remember_me->destroy();
 	}
 
 	// ------------------------------------------------------------------------

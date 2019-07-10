@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the Fuel framework.
+ * Fuel is a fast, lightweight, community driven PHP 5.4+ framework.
  *
  * @package    Fuel
- * @version    1.0
+ * @version    1.8.2
  * @author     Fuel Development Team
  * @license    MIT License
- * @copyright  2010 - 2012 Fuel Development Team
- * @link       http://fuelphp.com
+ * @copyright  2010 - 2019 Fuel Development Team
+ * @link       https://fuelphp.com
  */
 
 namespace Fuel\Core;
@@ -20,6 +20,12 @@ namespace Fuel\Core;
  */
 class Test_Date extends TestCase
 {
+	protected function setUp()
+	{
+		// make sure the locale and language are is set correctly for the tests
+		setlocale(LC_ALL, 'en_US') === false and setlocale(LC_ALL, 'en_US.UTF8');
+		\Config::set('language', 'en');
+	}
 
 	/**
 	 * Test for Date::days_in_month()
@@ -32,13 +38,33 @@ class Test_Date extends TestCase
 		$expected = 31;
 		$this->assertEquals($expected, $output);
 
-		$output = Date::days_in_month(2,2001);
+		$output = Date::days_in_month(2, 2001);
 		$expected = 28;
 		$this->assertEquals($expected, $output);
 
-		$output = Date::days_in_month(2,2000);
+		$output = Date::days_in_month(2, 2000);
 		$expected = 29;
 		$this->assertEquals($expected, $output);
+	}
+
+	/**
+	 * Test for Date::days_in_month(0)
+	 * @expectedException UnexpectedValueException
+	 * @test
+	 */
+	public function test_days_in_month_0_exception()
+	{
+		$output = Date::days_in_month(0);
+	}
+
+	/**
+	 * Test for Date::days_in_month(13)
+	 * @expectedException UnexpectedValueException
+	 * @test
+	 */
+	public function test_days_in_month_13_exception()
+	{
+		$output = Date::days_in_month(13);
 	}
 
 	/**
@@ -48,10 +74,13 @@ class Test_Date extends TestCase
 	 */
 	public function test_format()
 	{
+		$default_timezone = date_default_timezone_get();
 		date_default_timezone_set('UTC');
 
 		$output = Date::forge( 1294176140 )->format("%m/%d/%Y");
 		$expected = "01/04/2011";
+
+		date_default_timezone_set($default_timezone);
 
 		$this->assertEquals($expected, $output);
 	}
@@ -135,5 +164,80 @@ class Test_Date extends TestCase
 
 		$this->assertEquals('2 months ago', $output);
 	}
-}
 
+	/**
+	 * Test for Date::range_to_array()
+	 *
+	 * @test
+	 */
+	public function test_range_to_array()
+	{
+		$start = Date::create_from_string('2015-10-01', '%Y-%m-%d');
+		$end   = Date::create_from_string('2016-03-01', '%Y-%m-%d');
+		$range = Date::range_to_array($start, $end, "+1 month");
+
+		$expected = array('2015-10-01', '2015-11-01', '2015-12-01', '2016-01-01', '2016-02-01', '2016-03-01');
+		$output = array();
+		foreach ($range as $r)
+		{
+			$output[] = $r->format('%Y-%m-%d');
+		}
+
+		$this->assertEquals($expected, $output);
+	}
+
+	/**
+	 * Test for Date::range_to_array()
+	 *
+	 * @test
+	 */
+	public function test_range_to_array_empty()
+	{
+		$start = Date::create_from_string('2016-03-01', '%Y-%m-%d');
+		$end   = Date::create_from_string('2015-10-01', '%Y-%m-%d');
+		$range = Date::range_to_array($start, $end, "+1 month");
+
+		$expected = array();
+		$output = array();
+		foreach ($range as $r)
+		{
+			$output[] = $r->format('%Y-%m-%d');
+		}
+
+		$this->assertEquals($expected, $output);
+	}
+
+	/**
+	 * Test for Date::range_to_array()
+	 *
+	 * @test
+	 */
+	public function test_range_to_array_days()
+	{
+		$start = Date::create_from_string('2015-10-01', '%Y-%m-%d');
+		$end   = Date::create_from_string('2015-10-05', '%Y-%m-%d');
+		$range = Date::range_to_array($start, $end, "+4 days");
+
+		$expected = array('2015-10-01', '2015-10-05');
+		$output = array();
+		foreach ($range as $r)
+		{
+			$output[] = $r->format('%Y-%m-%d');
+		}
+
+		$this->assertEquals($expected, $output);
+	}
+
+	/**
+	 * Test for Date::range_to_array()
+	 * @expectedException UnexpectedValueException
+	 *
+	 * @test
+	 */
+	public function test_range_to_array_invalid()
+	{
+		$start = Date::create_from_string('2015-10-01', '%Y-%m-%d');
+		$end   = Date::create_from_string('2015-10-02', '%Y-%m-%d');
+		$range = Date::range_to_array($start, $end, "-2 days");
+	}
+}
