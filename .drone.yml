@@ -9,6 +9,7 @@ steps:
         from_secret: ansible_private_key
       playbook: .ansible/deploy.yml
       inventory: .ansible/inventory.yml
+      verbose: 4
     when:
       event:
       - push
