@@ -1,7 +1,5 @@
 <?php
-namespace Model;
-
-class Model_Article extends \Orm\Model {
+class Model_Article extends Orm\Model {
 	protected static $_properties = array(
 		'id',
 		'issue_id',

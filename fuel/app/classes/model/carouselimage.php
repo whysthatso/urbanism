@@ -1,7 +1,5 @@
 <?php
-namespace Model;
-
-class Model_Carouselimage extends \Orm\Model {
+class Model_Carouselimage extends Orm\Model {
 
 	protected static $_properties = array(
 		'id',
