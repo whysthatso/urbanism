@@ -2,7 +2,7 @@
 all:
   hosts:
     main:
-      ansible_host: vs1.whyservices.net
+      ansible_host: 91.250.115.11
       ansible_user: andreas
       ansible_port: 22
 ...
