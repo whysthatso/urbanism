@@ -3,7 +3,7 @@ all:
   hosts:
     main:
       ansible_host: vs1.whyservices.net
-      ansible_user: www.urban.ee
+      ansible_user: andreas
       ansible_port: 22
 ...
 

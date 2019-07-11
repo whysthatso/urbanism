@@ -6,7 +6,7 @@ steps:
     image: plugins/ansible:1
     settings:
       private_key:
-        from_secret: deploy
+        from_secret: ansible_private_key
       playbook: .ansible/deploy.yml
       inventory: .ansible/inventory.yml
     when:
