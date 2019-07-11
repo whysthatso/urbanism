@@ -33,3 +33,4 @@ desktop.ini
 /fuel/app/config/crypt.php
 
 /fuelphp-1.8.2
+deploy*

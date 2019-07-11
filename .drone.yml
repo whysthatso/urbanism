@@ -1,0 +1,33 @@
+kind: pipeline
+name: default
+
+steps:
+  - name: deploy theme to stage
+    image: plugins/ansible:1
+    settings:
+      private_key:
+        from_secret: ansible_private_key
+      playbook: .ansible/deploy.yml
+      inventory: .ansible/inventory.yml
+    when:
+      event:
+      - push
+      - tag
+
+  - name: send notification to telegram
+    image: appleboy/drone-telegram
+    settings:
+      token:
+        from_secret: telegram_token
+      to: 393273328
+      format: html
+      message: >
+        {{#success build.status}}
+          succeeded build {{build.link}} triggerd by {{commit.link}} from {{commit.author}}
+        {{else}}
+          failed build {{build.link}} triggerd by {{commit.link}} from {{commit.author}}
+        {{/success}}
+    when:
+      status:
+        - success
+        - failure
