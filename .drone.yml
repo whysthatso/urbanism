@@ -2,11 +2,11 @@ kind: pipeline
 name: default
 
 steps:
-  - name: deploy theme to stage
+  - name: deploy code to vs1
     image: plugins/ansible:1
     settings:
       private_key:
-        from_secret: ansible_private_key
+        from_secret: deploy
       playbook: .ansible/deploy.yml
       inventory: .ansible/inventory.yml
     when:
