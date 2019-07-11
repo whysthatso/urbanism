@@ -208,7 +208,7 @@ return array(
 	 * -------------------------------------------------------------------------
 	 */
 
-	'security' => array(
+	//'security' => array(
 		/**
 		 * ---------------------------------------------------------------------
 		 *  CSRF settings
@@ -254,7 +254,7 @@ return array(
 		 * ---------------------------------------------------------------------
 		 */
 
-		'uri_filter' => array('htmlentities'),
+		//'uri_filter' => array('htmlentities'),
 
 		// 'input_filter' => array(),
 
@@ -268,7 +268,7 @@ return array(
 		 * ---------------------------------------------------------------------
 		 */
 
-		'output_filter' => array('Security::htmlentities'),
+		//'output_filter' => array('Security::htmlentities'),
 
 		/**
 		 * ---------------------------------------------------------------------
@@ -302,15 +302,15 @@ return array(
 		 * ---------------------------------------------------------------------
 		 */
 
-		'whitelisted_classes' => array(
-			'Fuel\\Core\\Presenter',
-			'Fuel\\Core\\Response',
-			'Fuel\\Core\\View',
-			'Fuel\\Core\\ViewModel',
-			'Fuel\\Core\\Validation',
-			'Closure',
-		),
-	),
+		//'whitelisted_classes' => array(
+		//	'Fuel\\Core\\Presenter',
+		//	'Fuel\\Core\\Response',
+		//	'Fuel\\Core\\View',
+		//	'Fuel\\Core\\ViewModel',
+		//	'Fuel\\Core\\Validation',
+		//	'Closure',
+		//),
+	//),
 
 	/**
 	 * -------------------------------------------------------------------------
