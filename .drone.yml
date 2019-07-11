@@ -10,6 +10,7 @@ steps:
       playbook: .ansible/deploy.yml
       inventory: .ansible/inventory.yml
       verbose: 4
+      ssh_extra_args: -o StrictHostKeyChecking=no
     when:
       event:
       - push
