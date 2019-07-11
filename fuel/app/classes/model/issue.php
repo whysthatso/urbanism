@@ -1,6 +1,8 @@
 <?php
-class Model_Issue extends \Orm\Model
-{
+namespace Model;
+
+class Model_Issue extends \Orm\Model {
+
 	protected static $_properties = array(
 		'id',
 		'number',
@@ -18,7 +20,7 @@ class Model_Issue extends \Orm\Model
 		'updated_at',
 	);
 
-protected static $_has_many = array('articles');
+	protected static $_has_many = array('articles');
 
 	protected static $_observers = array(
 		'Orm\Observer_CreatedAt' => array(
@@ -31,8 +33,7 @@ protected static $_has_many = array('articles');
 		),
 	);
 
-	public static function validate($factory)
-	{
+	public static function validate($factory) {
 		$val = Validation::forge($factory);
 		$val->add_field('number', 'Number', 'required');
 		$val->add_field('title', 'Title', 'required|max_length[255]');
@@ -42,6 +43,4 @@ protected static $_has_many = array('articles');
 		// $val->add_field('published', 'Published', '');
 
 		return $val;
-	}
-
 }

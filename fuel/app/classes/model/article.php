@@ -1,8 +1,7 @@
 <?php
-use Orm\Model;
+namespace Model;
 
-class Model_Article extends Model
-{
+class Model_Article extends \Orm\Model {
 	protected static $_properties = array(
 		'id',
 		'issue_id',
@@ -19,8 +18,11 @@ class Model_Article extends Model
 		'created_at',
 		'updated_at',
 	);
-protected static $_belongs_to = array('issue', 'chapter');
-protected static $_has_many = array('carouselimages' => array('order_by' => 'carouselimages.sortorder'));
+
+	protected static $_belongs_to = array('issue', 'chapter');
+
+	protected static $_has_many = array('carouselimages' => array('order_by' => 'carouselimages.sortorder'));
+
 	protected static $_observers = array(
 		'Orm\Observer_CreatedAt' => array(
 			'events' => array('before_insert'),
@@ -41,8 +43,6 @@ protected static $_has_many = array('carouselimages' => array('order_by' => 'car
 		$val->add_field('body', 'Body', 'required');
 		$val->add_field('sortorder', 'Sortorder', 'required');
 
-
 		return $val;
 	}
-
 }

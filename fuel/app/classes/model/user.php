@@ -1,7 +1,9 @@
 <?php
 
-class Model_User extends \Orm\Model
-{
+namespace Model;
+
+class Model_User extends \Orm\Model {
+
 	protected static $_properties = array(
 		'id',
 		'username',

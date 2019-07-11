@@ -1,8 +1,8 @@
 <?php
-use Orm\Model;
+namespace Model;
 
-class Model_Chapter extends Model
-{
+class Model_Chapter extends \Orm\Model {
+
 	protected static $_properties = array(
 		'id',
 		'name_ee',
@@ -27,13 +27,12 @@ class Model_Chapter extends Model
 	public function name() {
 		return $name_en . " / " . $name_en;
 	}
-	public static function validate($factory)
-	{
+
+	public static function validate($factory) {
 		$val = Validation::forge($factory);
 		$val->add_field('name_ee', 'Eestikeelne nimi', 'required|max_length[255]');
 		$val->add_field('name_en', 'Name in English', 'required|max_length[255]');
 
 		return $val;
 	}
-
 }

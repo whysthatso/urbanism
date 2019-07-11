@@ -1,8 +1,8 @@
 <?php
-use Orm\Model;
+namespace Model;
 
-class Model_Carouselimage extends Model
-{
+class Model_Carouselimage extends \Orm\Model {
+
 	protected static $_properties = array(
 		'id',
 		'filename',
@@ -12,7 +12,9 @@ class Model_Carouselimage extends Model
 		'created_at',
 		'updated_at',
 	);
-protected static $_belongs_to = array('article');
+
+	protected static $_belongs_to = array('article');
+
 	protected static $_observers = array(
 		'Orm\Observer_CreatedAt' => array(
 			'events' => array('before_insert'),
