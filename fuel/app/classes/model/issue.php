@@ -43,4 +43,5 @@ class Model_Issue extends \Orm\Model {
 		// $val->add_field('published', 'Published', '');
 
 		return $val;
+	}
 }
