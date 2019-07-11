@@ -11,13 +11,32 @@
  */
 
 return array(
-	'_root_'  => 'issues/index', // The default route
-	'_404_'   => 'welcome/404',    // The main 404 route
+	/**
+	 * -------------------------------------------------------------------------
+	 *  Default route
+	 * -------------------------------------------------------------------------
+	 *
+	 */
+
+	'_root_' => 'welcome/index',
+
+	/**
+	 * -------------------------------------------------------------------------
+	 *  Page not found
+	 * -------------------------------------------------------------------------
+	 *
+	 */
+
+	'_404_' => 'welcome/404',
+
+	/**
+	 * -------------------------------------------------------------------------
+	 *  Example for Presenter
+	 * -------------------------------------------------------------------------
+	 *
+	 *  A route for showing page using Presenter
+	 *
+	 */
 
 	'hello(/:name)?' => array('welcome/hello', 'name' => 'hello'),
-  'admin/articles/create/:issue' => 'admin/articles/create',
-    'issue/:locale/:id' => 'issues/view',
-    'admin/issue/:locale/:id' => 'admin/issues/view',
-  'issues/:locale' => 'issues/index'
-
 );
