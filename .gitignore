@@ -33,4 +33,5 @@ desktop.ini
 /fuel/app/config/crypt.php
 
 /fuelphp-1.8.2
-deploy*
+deploy_www_urban_ee
+deploy_www_urban_ee.pub

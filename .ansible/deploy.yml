@@ -1,0 +1,36 @@
+---
+- hosts: main
+  become: yes
+  become_user: root
+  become_method: sudo
+
+  tasks:
+  - name: sync local git repo with remote
+    git:
+      repo: ssh://git@github.com/whysthatso/urbanism.git
+      dest: /var/www/www.urban.ee
+      key_file: /home/www.urban.ee/.ssh/id_rsa
+      accept_hostkey: yes
+      force: yes
+
+  - name: set rights on code folder
+    file:
+      path: /var/www/www.urban.ee
+      owner: www.urban.ee
+      group: www-data
+      mode: u=rwX,g=rwX,o=rX
+      recurse: yes
+
+  - name: set rights to allow php-fpm to write to certain folders
+    acl:
+      path: "{{ item }}"
+      entity: www-fpm
+      etype: user
+      permissions: rwX
+      state: present
+      recursive: yes
+    with_items:
+      - /var/www/www.urban.ee/fuel/app/cache
+      - /var/www/www.urban.ee/fuel/app/tmp
+      - /var/www/www.urban.ee/fuel/app/logs
+...
